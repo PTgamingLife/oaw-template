@@ -8,7 +8,7 @@
 2. 點一下黑色終端機,按鍵盤的 **Enter**
 
 ```bash
-bash ~/cloudshell_open/oaw-template/oaw/serve.sh
+bash oaw/serve.sh
 ```
 
 終端機印出網址後,再按下方「下一步」。
