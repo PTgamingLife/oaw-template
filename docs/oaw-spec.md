@@ -1,4 +1,4 @@
-# OAW 規格書 v0.1 — 精靈網頁 + 客戶自己的 GitHub Actions
+# OAW 規格書 v0.2 — 精靈網頁 + 客戶自己的 GitHub Actions
 
 > 狀態:**草稿,待確認**。確認前不寫程式。
 > 標 ❓ = 需實測;標 🟡 = 待你決定。
@@ -63,8 +63,23 @@
 
 ## 4. 精靈頁面細節
 
-共 10 頁,上方進度點 ●●○○○。每頁底部固定「上一步 / 下一步」。輸入值只存在**頁面記憶體**;
-為了切 App 回來不遺失,非機密欄位存 `sessionStorage`,**機密欄位不存**(回來若頁面被系統重載,需重貼)。
+共 10 頁,上方進度點 ●●○○○。每頁底部固定「上一步 / 下一步」。
+
+### 進度保存:切 App、頁面被清掉都不用重貼
+
+**原則:每貼一個金鑰、驗證通過 → 立刻加密寫進客戶 repo 的 Actions Secrets。進度存在客戶 GitHub,不存在手機。**
+
+| 資料 | 存在哪 | 回來時 |
+|---|---|---|
+| P1 非機密設定 | P2 前:`localStorage`;P2 建好 repo 後:repo 的 Actions Variables | 從 Variables 讀回 |
+| Supabase / LINE 金鑰 | 驗證通過即寫入 Actions Secrets,手機不留 | `GET /actions/secrets` 只回傳**名稱**,已存在就打勾 ✅、跳到下一個未完成步驟 |
+| **GitHub token**(唯一存在手機的) | 用客戶設的 **6 位數 PIN** 加密(PBKDF2 → AES-GCM,WebCrypto)後存 `localStorage` | 輸入 PIN 解鎖;PIN 錯 5 次或超過 **2 小時** → 自動刪除,需重貼 token |
+| 開站進度 | repo 的 `oaw/status.json` | 直接讀取 |
+
+- 回來流程:開精靈 →「繼續上次的設定」→ 輸入 PIN → 自動跳到未完成步驟
+- 換手機 / 清了瀏覽器:重貼 GitHub token + 選 repo,其餘已存的不用重貼
+- 開站完成、或按「清除這支手機上的資料」→ 立即刪除 `localStorage` 全部內容
+- 加密原因:`ptgaminglife.github.io` 下所有 Pages 專案共用同一個瀏覽器儲存空間,明文存放會被同網域其他頁面讀到
 
 ### P0 歡迎
 - 標題:「10 分鐘,把你的 LINE 官方帳號接上會員系統」
@@ -87,12 +102,16 @@
 2. 圖示教學:滑到最下 → Generate token → 複製
 3. 貼上欄位 → 「驗證」:`GET /user` + 讀 `x-oauth-scopes` 標頭
    - ✅「已連線:{login}」/ ❌「金鑰錯誤」/ ❌「缺少 workflow 權限,請重新產生」
-4. 欄位:repo 名稱(預設 `{px}-oa`)→ 檢查是否已存在,存在則提示改名或「沿用(重跑)」
+4. 設定 6 位數 PIN(輸入兩次)→ token 加密存手機(見「進度保存」)
+5. 欄位:repo 名稱(預設 `{px}-oa`)→ 檢查是否已存在,存在則提示改名或「沿用(繼續上次)」
+6. 按「建立我的 repo」→ **立即執行 W2–W5**(建 repo、等就緒、寫入 P1 Variables 與隨機產生的 `OAW_SB_DB_PASS`、開 Pages)
+   → ✅「已建立:github.com/{login}/{repo}」
 
 ### P3 Supabase 金鑰
 1. 按鈕「開啟 Supabase 金鑰頁」→ `https://supabase.com/dashboard/account/tokens`
 2. 圖示教學:Generate new token → 名稱 `OAW` → 複製
 3. 貼上 → 格式檢查(`sbp_` 開頭)。真正驗證在 Actions S2 ❓(若 Supabase API 允許瀏覽器呼叫,改為當場驗證)
+4. 通過 → 立即寫入 Secret `SUPABASE_ACCESS_TOKEN` → ✅「已存入你的 GitHub」,欄位清空
 
 ### P4 LINE Messaging API(4 個值的前 2 個)
 截圖步驟:
@@ -101,6 +120,7 @@
 3. 複製 **Channel ID**(數字)、**Channel secret**(32 碼)
 
 檢查:ID 為 10 位數字、secret 為 32 碼十六進位;真正驗證在 Actions S8。
+每個值通過即寫入 Secret(`OAW_LINE_MSG_ID`、`OAW_LINE_MSG_SECRET`)→ ✅,可以分兩次切 App 去複製。
 
 ### P5 LINE Login(LIFF 用)
 截圖步驟:
@@ -110,8 +130,11 @@
 4. ⚠️ 頁面上方狀態從 Developing 改 **Published**(不改的話一般使用者打不開 LIFF)
 5. (選做)Linked LINE Official Account 選這個 OA
 
+ID、Secret 各自通過即寫入 Secret(`OAW_LINE_LOGIN_ID`、`OAW_LINE_LOGIN_SECRET`)→ ✅。
+
 ### P6 確認
-- 列出所有設定,金鑰遮罩顯示 `sbp_••••3f2a`
+- 列出所有設定;金鑰不再顯示內容,只顯示「✅ 已存入你的 GitHub」(由 `GET /actions/secrets` 名稱比對)
+- 缺任何一項 → 該列紅字 + 「前往補上」
 - 列出將建立的東西:repo、Pages、Supabase 專案/資料表/2 個 Function、Webhook、LIFF、圖文選單
 - 按鈕:**一鍵開站**
 
@@ -120,12 +143,7 @@
 
 | # | 步驟 | 誰執行 |
 |---|---|---|
-| W1 | 確認 GitHub 帳號 | 瀏覽器 |
-| W2 | 從範本建立 repo | 瀏覽器 |
-| W3 | 等 repo 就緒 | 瀏覽器 |
-| W4 | 加密寫入 Secrets / Variables | 瀏覽器 |
-| W5 | 開啟 Pages | 瀏覽器 |
-| W6 | 觸發 oaw-setup | 瀏覽器 |
+| W6 | 觸發 oaw-setup(W1–W5 已在 P2–P5 完成) | 瀏覽器 |
 | S1–S13 | Actions 各步驟(§6) | 客戶 Actions,精靈每 5 秒輪詢 job steps |
 
 頁面關掉再開:輸入 repo 名稱 → 讀 `oaw/status.json` 接續顯示。
@@ -149,14 +167,15 @@
 
 ## 5. 瀏覽器端動作(只打 api.github.com)
 
-| # | API | 備註 |
-|---|---|---|
-| W1 | `GET /user` | 取 login |
-| W2 | `POST /repos/PTgamingLife/oaw-template/generate` `{owner, name, private:false}` | Pages 免費版需公開 |
-| W3 | 輪詢 `GET /repos/{o}/{r}/contents/oaw` | 最多 60 秒 |
-| W4 | `GET /actions/secrets/public-key` → libsodium sealed box 加密 → `PUT /actions/secrets/{name}`;非機密用 `POST /actions/variables` | libsodium 從 cdnjs 載入,鎖版本 |
-| W5 | `POST /repos/{o}/{r}/pages` `{build_type:"workflow"}` | 已開則略過 |
-| W6 | `POST /actions/workflows/oaw-setup.yml/dispatches` `{ref:"main"}` → 輪詢 runs / jobs | 新 repo 的 Actions 可能需數秒才可觸發 ❓ |
+| # | 何時 | API | 備註 |
+|---|---|---|---|
+| W1 | P2 驗證 | `GET /user` | 取 login、讀權限 |
+| W2 | P2 建立 | `POST /repos/PTgamingLife/oaw-template/generate` `{owner, name, private:false}` | Pages 免費版需公開 |
+| W3 | P2 建立 | 輪詢 `GET /repos/{o}/{r}/contents/oaw` | 最多 60 秒 |
+| W4 | P2–P5 每次通過 | `GET /actions/secrets/public-key` → libsodium sealed box 加密 → `PUT /actions/secrets/{name}`;非機密用 `POST /actions/variables` | libsodium 從 cdnjs 載入,鎖版本 |
+| W5 | P2 建立 | `POST /repos/{o}/{r}/pages` `{build_type:"workflow"}` | 已開則略過 |
+| W6 | P6 一鍵開站 | `POST /actions/workflows/oaw-setup.yml/dispatches` `{ref:"main"}` → 輪詢 runs / jobs | 新 repo 的 Actions 可能需數秒才可觸發 ❓ |
+| W7 | 回來時 / P6 | `GET /actions/secrets`、`GET /actions/variables` | 只取名稱,恢復進度用 |
 
 ### Secrets / Variables 一覽
 
@@ -168,7 +187,7 @@
 | `OAW_LINE_LOGIN_ID` / `OAW_LINE_LOGIN_SECRET` | Secret | P5 | LIFF / ID token 驗證 |
 | `OAW_PX`、`OAW_NAME`、`OAW_THEME`、`OAW_SB_REGION`、`OAW_SB_REF` | Variable | P1 | 非機密設定 |
 
-GitHub token **不寫入任何地方**,只在瀏覽器記憶體。
+GitHub token **不寫入 GitHub**,只以 PIN 加密暫存在客戶手機(最長 2 小時)。
 
 ---
 
@@ -229,12 +248,13 @@ GitHub token **不寫入任何地方**,只在瀏覽器記憶體。
 ## 9. 安全設計
 
 1. 精靈純靜態、原始碼公開、以 tag 固定版本部署;第三方程式只有 libsodium(cdnjs 鎖版本 + SRI)
-2. GitHub token 只在記憶體;不寫 storage、不送第三方
-3. 所有機密在瀏覽器以 repo 公鑰加密後才離開手機
-4. Actions log:所有金鑰用 `::add-mask::`;status.json 只寫公開值
-5. LINE token 用 stateless(15 分鐘),不存長效 token
-6. Webhook 驗簽、LIFF 驗 ID token;資料表 RLS 全開
-7. 開站完成提醒刪除 GitHub token
+2. GitHub token 以 PIN 加密暫存手機(PBKDF2 ≥ 300,000 次 + AES-GCM),2 小時 / PIN 錯 5 次 / 完成即刪;不送第三方
+3. 其他金鑰手機不留:通過即寫入 GitHub Secrets,欄位立即清空
+4. 所有機密在瀏覽器以 repo 公鑰加密後才離開手機
+5. Actions log:所有金鑰用 `::add-mask::`;status.json 只寫公開值
+6. LINE token 用 stateless(15 分鐘),不存長效 token
+7. Webhook 驗簽、LIFF 驗 ID token;資料表 RLS 全開
+8. 開站完成提醒刪除 GitHub token
 
 ---
 
@@ -267,3 +287,4 @@ GitHub token **不寫入任何地方**,只在瀏覽器記憶體。
 2. **階段二 AI 用誰的**:(a) 客戶自己的 Claude 帳號 / (b) 你提供(你的帳號經客戶授權改他的 repo)
 3. **Supabase 預設區域**:東京 or 新加坡
 4. **精靈網頁放哪**:`oaw-template` 的 Pages(原始碼公開、方便客戶查核)— 建議如此
+5. **獨立網域**:精靈放 `oaw.你的網域` 可與你其他 Pages 隔離儲存空間;沒有網域則維持 github.io + PIN 加密(目前規格)
