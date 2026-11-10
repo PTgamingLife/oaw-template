@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OAW 測試</title>
+<style>
+  :root { --oaw-bg:#f6f7f9; --oaw-card:#fff; --oaw-text:#1f2937; --oaw-muted:#6b7280; --oaw-main:#06c755; --oaw-bad:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif; background:var(--oaw-bg); color:var(--oaw-text); }
+  main { max-width:480px; margin:0 auto; padding:24px 16px calc(24px + env(safe-area-inset-bottom)); }
+  h1 { font-size:24px; margin:8px 0 4px; }
+  p { color:var(--oaw-muted); line-height:1.6; margin:0 0 16px; }
+  .oaw-card { background:var(--oaw-card); border-radius:16px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:16px; }
+  button { width:100%; min-height:52px; border:0; border-radius:12px; background:var(--oaw-main); color:#fff; font-size:17px; font-weight:600; }
+  button:active { opacity:.8; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:8px 12px; margin:16px 0 0; font-size:15px; }
+  dt { color:var(--oaw-muted); } dd { margin:0; word-break:break-all; }
+  #oaw_status { font-weight:600; margin-top:12px; }
+  .oaw-ok { color:var(--oaw-main); } .oaw-bad { color:var(--oaw-bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>✅ 你的 Cloud Shell 網頁已開啟</h1>
+  <p>這個頁面跑在你自己 Google 帳號的 Cloud Shell 裡。之後的開站步驟都會在這種頁面上用按鈕完成,不用碰終端機。</p>
+  <div class="oaw-card">
+    <button id="oaw_ping_btn" type="button">測試連線</button>
+    <div id="oaw_status"></div>
+    <dl id="oaw_info" hidden>
+      <dt>主機</dt><dd id="oaw_host"></dd>
+      <dt>帳號</dt><dd id="oaw_user"></dd>
+      <dt>Cloud Shell</dt><dd id="oaw_cs"></dd>
+      <dt>時間</dt><dd id="oaw_time"></dd>
+    </dl>
+  </div>
+</main>
+<script>
+  const oaw_$ = (id) => document.getElementById(id);
+  oaw_$("oaw_ping_btn").addEventListener("click", async () => {
+    const oaw_status = oaw_$("oaw_status");
+    oaw_status.textContent = "連線中…"; oaw_status.className = "";
+    try {
+      const oaw_res = await fetch("api/oaw_ping", { cache: "no-store" });
+      if (!oaw_res.ok) throw new Error("HTTP " + oaw_res.status);
+      const oaw_data = await oaw_res.json();
+      oaw_$("oaw_host").textContent = oaw_data.oaw_host;
+      oaw_$("oaw_user").textContent = oaw_data.oaw_user || "-";
+      oaw_$("oaw_cs").textContent = oaw_data.oaw_cloudshell ? "是" : "否(本機)";
+      oaw_$("oaw_time").textContent = new Date(oaw_data.oaw_time).toLocaleString("zh-TW");
+      oaw_$("oaw_info").hidden = false;
+      oaw_status.textContent = "連線成功"; oaw_status.className = "oaw-ok";
+    } catch (oaw_err) {
+      oaw_status.textContent = "連線失敗:" + oaw_err.message; oaw_status.className = "oaw-bad";
+    }
+  });
+</script>
+</body>
+</html>
