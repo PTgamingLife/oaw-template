@@ -1,5 +1,7 @@
 # OAW 規格書 v0.2 — 精靈網頁 + 客戶自己的 GitHub Actions
 
+> **已被取代**：現行規格是 Aprico repo 的 `docs/SIMPLIFIED-FLOW.md`。本文件保留作為紀錄。
+
 > 狀態:**草稿,待確認**。確認前不寫程式。
 > 標 ❓ = 需實測;標 🟡 = 待你決定。
 

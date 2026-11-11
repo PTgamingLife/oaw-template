@@ -1,0 +1,137 @@
+// LIFF page for one OA app: member card, menu pages, and the owner's menu publisher.
+const app = document.getElementById('app');
+const cfg = window.OAW;
+
+const h = (tag, attrs = {}, ...children) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const c of children.flat()) if (c != null) el.append(c);
+  return el;
+};
+const show = (...nodes) => app.replaceChildren(...nodes);
+const fail = (msg) => show(h('p', { class: 'error' }, msg));
+
+async function call(action, extra = {}) {
+  const res = await fetch(cfg.api, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, idToken: liff.getIDToken(), ...extra }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Error(data.error || 'failed');
+  return data;
+}
+
+function memberCard(me, profile) {
+  const joined = me.member?.joined_at
+    ? new Date(me.member.joined_at).toLocaleDateString('zh-TW')
+    : '';
+  return h(
+    'section',
+    { class: 'card member' },
+    profile?.pictureUrl ? h('img', { src: profile.pictureUrl, alt: '' }) : null,
+    h(
+      'div',
+      {},
+      h('div', { class: 'no' }, `會員編號 ${String(me.member?.member_no ?? '').padStart(5, '0')}`),
+      h('div', { class: 'name' }, profile?.displayName || me.member?.display_name || '會員'),
+      joined ? h('div', { class: 'no' }, `加入日期 ${joined}`) : null,
+    ),
+  );
+}
+
+function links(config) {
+  const items = config.cells
+    .map((c, i) => ({ ...c, i }))
+    .filter((c) => c.label && (c.action === 'web' || (c.action === 'full' && c.content)));
+  if (!items.length) return null;
+  return h(
+    'section',
+    { class: 'links' },
+    items.map((c) =>
+      c.action === 'web'
+        ? h('a', { class: 'btn', href: c.content, target: '_blank', rel: 'noreferrer' }, c.label)
+        : h('a', { class: 'btn', href: `?cell=${c.i}` }, c.label),
+    ),
+  );
+}
+
+export function menuAreas(grid, width = 1200, height = 810) {
+  const columns = grid === 6 ? 3 : 2,
+    rows = grid / columns,
+    w = width / columns;
+  return Array.from({ length: grid }, (_, index) => {
+    const row = Math.floor(index / columns),
+      top = Math.floor((row * height) / rows),
+      bottom = Math.floor(((row + 1) * height) / rows);
+    return { index, x: (index % columns) * w, y: top, w, h: bottom - top };
+  });
+}
+
+function drawMenu(canvas, config) {
+  canvas.width = 1200;
+  canvas.height = 810;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fffef9';
+  ctx.fillRect(0, 0, 1200, 810);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const a of menuAreas(config.grid)) {
+    ctx.fillStyle = config.colors[a.index % 4];
+    ctx.fillRect(a.x + 4, a.y + 4, a.w - 8, a.h - 8);
+    ctx.fillStyle = '#2b2b2b';
+    ctx.font = 'bold 44px "PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+    ctx.fillText(
+      (config.cells[a.index].label || `功能 ${a.index + 1}`).slice(0, 8),
+      a.x + a.w / 2,
+      a.y + a.h / 2,
+    );
+  }
+}
+
+async function adminView(me) {
+  if (!me.isOwner) return fail('只有這個帳號的管理者可以發布選單。');
+  const canvas = h('canvas');
+  drawMenu(canvas, me.config);
+  const status = h(
+    'p',
+    { class: 'muted' },
+    '確認下方預覽，按「發布選單」後，所有好友會看到新的圖文選單。',
+  );
+  const button = h('button', { class: 'btn primary', type: 'button' }, '發布選單');
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    status.textContent = '發布中…';
+    try {
+      const image = canvas.toDataURL('image/png').split(',')[1];
+      await call('publish_menu', { image });
+      status.textContent = '已發布。回到聊天室就能看到新的選單。';
+    } catch (e) {
+      status.textContent = `發布失敗（${e.message}），請稍後再試。`;
+      button.disabled = false;
+    }
+  });
+  show(h('h1', {}, '圖文選單'), canvas, status, button);
+}
+
+async function main() {
+  if (!cfg?.liffId) return fail('這個頁面還沒完成設定。');
+  await liff.init({ liffId: cfg.liffId });
+  if (!liff.isLoggedIn()) return liff.login({ redirectUri: location.href });
+  const params = new URLSearchParams(location.search);
+  const [me, profile] = await Promise.all([call('me'), liff.getProfile().catch(() => null)]);
+  document.documentElement.style.setProperty('--accent', me.config.colors[0]);
+  document.title = me.config.oaName || '會員中心';
+  if (params.get('view') === 'admin') return adminView(me);
+  const index = Number(params.get('cell'));
+  const cell = params.has('cell') ? me.config.cells[index] : null;
+  if (cell?.content && cell.action === 'full')
+    return show(h('h1', {}, cell.label), h('section', { class: 'card content' }, cell.content));
+  show(h('h1', {}, me.config.oaName || '會員中心'), memberCard(me, profile), links(me.config));
+}
+
+if (window.liff) main().catch((e) => fail(`載入失敗（${e.message}），請關閉後重新開啟。`));
