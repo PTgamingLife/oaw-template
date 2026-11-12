@@ -50,7 +50,7 @@ test('chat shortcuts become measurements', () => {
   assert.equal(parseMeasureText('今天天氣好'), null);
 });
 
-test('reminders fire once in their window and missed ones after two hours', () => {
+test('reminders are due for two hours and missed ones are reported after that', () => {
   const list = reminders([
     { time: '20:00', kind: 'med', label: '晚上吃藥' },
     { time: '08:00', kind: 'measure', label: '量血壓' },
@@ -64,7 +64,11 @@ test('reminders fire once in their window and missed ones after two hours', () =
     dueSlots(list, '08:10').map((r) => r.slot),
     [0],
   );
-  assert.deepEqual(dueSlots(list, '08:15'), []);
+  assert.deepEqual(
+    dueSlots(list, '09:30').map((r) => r.slot),
+    [0],
+  );
+  assert.deepEqual(dueSlots(list, '10:00'), []);
   assert.deepEqual(
     missedSlots(list, '10:05', []).map((r) => r.slot),
     [0],

@@ -16,6 +16,7 @@ import {
   quotaCard,
 } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
+import { healthChat } from '../_shared/health-chat.ts';
 import {
   apricoKey,
   bindGroup,
@@ -86,6 +87,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     return;
   }
   if (event.type === 'postback') {
+    const health = await healthChat(event, userId, await ownerId(), line);
+    if (health) return void (await reply(health));
     const index = postbackCell(String(event.postback?.data ?? ''), config);
     if (index >= 0) await reply(cellMessage(config, index));
     return;
@@ -93,6 +96,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   if (event.type !== 'message' || event.message?.type !== 'text') return;
 
   const owner = await ownerId();
+  const health = await healthChat(event, userId, owner, line);
+  if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);
   if (intent.kind === 'connect') {
     if (owner && owner !== userId) {

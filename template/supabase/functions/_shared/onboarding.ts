@@ -237,7 +237,10 @@ export function quotaCard(subscribeUrl: string) {
   );
 }
 
-export function noticeCard(title: string, body: string, button?: { label: string; uri: string }) {
+/** A card button opens a page (uri) or reports back to the webhook (data → postback). */
+type CardButton = { label: string; uri: string } | { label: string; data: string; text?: string };
+
+export function noticeCard(title: string, body: string, button?: CardButton) {
   return {
     type: 'flex',
     altText: `${title}：${body}`.slice(0, 400),
@@ -270,7 +273,15 @@ export function noticeCard(title: string, body: string, button?: { label: string
                   style: 'primary',
                   color: BRAND.ink,
                   height: 'sm',
-                  action: { type: 'uri', label: button.label.slice(0, 20), uri: button.uri },
+                  action:
+                    'uri' in button
+                      ? { type: 'uri', label: button.label.slice(0, 20), uri: button.uri }
+                      : {
+                          type: 'postback',
+                          label: button.label.slice(0, 20),
+                          data: button.data,
+                          ...(button.text ? { displayText: button.text } : {}),
+                        },
                 },
               ],
             },

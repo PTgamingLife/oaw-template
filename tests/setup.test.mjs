@@ -26,6 +26,8 @@ test('render applies the prefix to SQL, function folders and px.ts', () => {
     assert.ok(existsSync(`${out}/supabase/functions/cafe-webhook/index.ts`));
     assert.ok(existsSync(`${out}/supabase/functions/cafe-api/index.ts`));
     assert.ok(existsSync(`${out}/supabase/functions/cafe-digest/index.ts`));
+    assert.ok(existsSync(`${out}/supabase/functions/cafe-health/index.ts`));
+    assert.match(sql, /cafe_h_caregivers/);
     assert.match(sql, /cafe_messages/);
     assert.equal(
       readFileSync(`${out}/supabase/functions/_shared/px.ts`, 'utf8'),
@@ -60,4 +62,18 @@ test('owner menu splits 2500x843 into two settings links', async () => {
     ['https://liff.line.me/1-a?view=secretary', 'https://liff.line.me/1-a?view=interface'],
   );
   assert.equal(m.areas[0].bounds.width + m.areas[1].bounds.width, 2500);
+});
+
+test('health template gets one 4-tab menu into the health pages', async () => {
+  const { ownerMenu } = await import('../scripts/oaw-setup.mjs');
+  const m = ownerMenu('cafe', 'https://liff.line.me/1-a', true);
+  assert.equal(m.name, 'cafe-owner');
+  assert.deepEqual(
+    m.areas.map((a) => a.action.uri.split('tab=')[1]),
+    ['today', 'scan', 'calendar', 'family'],
+  );
+  assert.equal(
+    m.areas.reduce((w, a) => w + a.bounds.width, 0),
+    2500,
+  );
 });

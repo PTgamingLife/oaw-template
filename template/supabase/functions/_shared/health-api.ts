@@ -178,13 +178,11 @@ export async function healthAction(action: string, body: any, userId: string) {
     case 'h_consent': {
       if (!owner || body.agree !== true) fail('health_forbidden');
       const now = new Date().toISOString();
-      await db
-        .from(T('h_profile'))
-        .upsert({
-          id: 1,
-          consent_at: p!.consent_at ?? now,
-          share_at: body.share === true ? now : null,
-        });
+      await db.from(T('h_profile')).upsert({
+        id: 1,
+        consent_at: p!.consent_at ?? now,
+        share_at: body.share === true ? now : null,
+      });
       return state(role);
     }
     case 'h_measure':
@@ -219,13 +217,11 @@ export async function healthAction(action: string, body: any, userId: string) {
       return state(role);
     case 'h_settings':
       if (!owner) fail('health_forbidden');
-      await db
-        .from(T('h_profile'))
-        .upsert({
-          id: 1,
-          thresholds: thresholds(body.thresholds),
-          reminders: reminders(body.reminders),
-        });
+      await db.from(T('h_profile')).upsert({
+        id: 1,
+        thresholds: thresholds(body.thresholds),
+        reminders: reminders(body.reminders),
+      });
       return state(role);
     case 'h_invite': {
       if (!owner) fail('health_forbidden');
@@ -233,13 +229,11 @@ export async function healthAction(action: string, body: any, userId: string) {
         6,
         '0',
       );
-      await db
-        .from(T('h_profile'))
-        .upsert({
-          id: 1,
-          invite_hash: await sha256(`family:${code}`),
-          invite_expires: new Date(Date.now() + 864e5).toISOString(),
-        });
+      await db.from(T('h_profile')).upsert({
+        id: 1,
+        invite_hash: await sha256(`family:${code}`),
+        invite_expires: new Date(Date.now() + 864e5).toISOString(),
+      });
       return { code, text: `家人 ${code}` };
     }
     case 'h_caregiver': {

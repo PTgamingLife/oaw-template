@@ -135,23 +135,35 @@ export function taipei(now = new Date()) {
   return { day: s.slice(0, 10), time: s.slice(11, 16) };
 }
 
-/** Reminders that are due in the 15-minute window ending at `time`. */
+const mins = (hhmm: string) => +hhmm.slice(0, 2) * 60 + +hhmm.slice(3, 5);
+
+/**
+ * Reminders whose time has come within the last two hours. The scheduler sends each
+ * once a day (it remembers what it sent), so a late GitHub run still delivers them.
+ */
 export function dueSlots(list: Reminder[], time: string) {
-  const mins = (hhmm: string) => +hhmm.slice(0, 2) * 60 + +hhmm.slice(3, 5);
   const now = mins(time);
   return list
     .map((r, slot) => ({ ...r, slot }))
-    .filter((r) => mins(r.time) <= now && now - mins(r.time) < 15);
+    .filter((r) => now >= mins(r.time) && now - mins(r.time) < 120);
 }
 
-/** Reminders still not done two hours after their time (the caregiver gets one notice). */
+/** Reminders not done 2–4 hours after their time (each caregiver gets one notice). */
 export function missedSlots(list: Reminder[], time: string, done: number[]) {
-  const mins = (hhmm: string) => +hhmm.slice(0, 2) * 60 + +hhmm.slice(3, 5);
   const now = mins(time);
   return list
     .map((r, slot) => ({ ...r, slot }))
-    .filter((r) => !done.includes(r.slot) && now - mins(r.time) >= 120 && now - mins(r.time) < 135);
+    .filter((r) => !done.includes(r.slot) && now - mins(r.time) >= 120 && now - mins(r.time) < 240);
 }
+
+/** Sunday 20:00–23:59 Taipei is when the weekly report goes out. */
+export const weeklyDue = (now = new Date()) => {
+  const t = new Date(now.getTime() + 8 * 3600 * 1000);
+  return t.getUTCDay() === 0 && t.getUTCHours() >= 20;
+};
+
+/** 20:00–23:59 Taipei: remind about tomorrow's events. */
+export const eveningDue = (time: string) => mins(time) >= 20 * 60;
 
 export const notifySettings = (raw: any) => ({
   alert: raw?.alert !== false,

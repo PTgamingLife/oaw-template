@@ -9,6 +9,7 @@ import { validateConfig } from '../template/supabase/functions/_shared/logic.ts'
 
 const DRY = process.argv.includes('--dry-run');
 const E = (name) => (process.env[name] ?? '').trim();
+const HEALTH = E('OAW_TEMPLATE') === 'health';
 const SB = 'https://api.supabase.com';
 const LINE = 'https://api.line.me';
 // Aprico app API (status / design / digest / secretary replies), billed per owner.
@@ -17,8 +18,25 @@ const APRICO_URL = 'https://hhcubvixldieuwdeqnwc.supabase.co/functions/v1/line-o
 const LIFF_SCOPE = ['openid', 'profile', 'chat_message.write'];
 
 /** Owner-only rich menu (2500x843): left = AI secretary settings, right = interface settings. */
-export function ownerMenu(px, liffUrl) {
+export function ownerMenu(px, liffUrl, health = false) {
   const half = { y: 0, width: 1250, height: 843 };
+  // Health template: the elder and the family share one 4-tab menu into the health pages.
+  if (health)
+    return {
+      size: { width: 2500, height: 843 },
+      selected: true,
+      name: `${px}-owner`,
+      chatBarText: '健康秘書',
+      areas: [
+        ['today', '今天'],
+        ['scan', '看健'],
+        ['calendar', '行事曆'],
+        ['family', '家人與設定'],
+      ].map(([tab, label], i) => ({
+        bounds: { x: i * 625, y: 0, width: 625, height: 843 },
+        action: { type: 'uri', label, uri: `${liffUrl}?view=health&tab=${tab}` },
+      })),
+    };
   return {
     size: { width: 2500, height: 843 },
     selected: true,
@@ -64,6 +82,7 @@ export function render(px, out = 'build') {
   cpSync('template/supabase/functions/oaw-webhook', `${fn}/${px}-webhook`, { recursive: true });
   cpSync('template/supabase/functions/oaw-api', `${fn}/${px}-api`, { recursive: true });
   cpSync('template/supabase/functions/oaw-digest', `${fn}/${px}-digest`, { recursive: true });
+  cpSync('template/supabase/functions/oaw-health', `${fn}/${px}-health`, { recursive: true });
   writeFileSync(`${fn}/_shared/px.ts`, `export const PX = '${px}';\n`);
   writeFileSync(`${out}/supabase/config.toml`, `project_id = "${px}-oa"\n`);
   return readFileSync('template/supabase/schema.sql', 'utf8').replaceAll('__px__', px);
@@ -262,6 +281,7 @@ async function main() {
     APRICO_KEY: E('OAW_APRICO_KEY'),
     APRICO_URL: E('OAW_APRICO_URL') || APRICO_URL,
     APRICO_SUBSCRIBE_URL: E('OAW_APRICO_SUBSCRIBE_URL'),
+    TEMPLATE: HEALTH ? 'health' : '',
   };
   await api(SB, `/v1/projects/${ref}/secrets`, {
     token: sbToken,
@@ -272,7 +292,7 @@ async function main() {
   });
   step('supabase_secrets');
 
-  for (const fn of [`${px}-webhook`, `${px}-api`, `${px}-digest`])
+  for (const fn of [`${px}-webhook`, `${px}-api`, `${px}-digest`, `${px}-health`])
     execFileSync(
       'supabase',
       [
@@ -316,12 +336,12 @@ async function main() {
   const { richMenuId } = await api(LINE, '/v2/bot/richmenu', {
     token: botToken,
     method: 'POST',
-    body: ownerMenu(px, liffUrl),
+    body: ownerMenu(px, liffUrl, HEALTH),
   });
   const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
-    body: readFileSync('oaw/owner-menu.png'),
+    body: readFileSync(HEALTH ? 'oaw/health-menu.png' : 'oaw/owner-menu.png'),
   });
   if (!up.ok) throw Error(`上傳擁有者選單圖片失敗（HTTP ${up.status}）`);
   const rows = await api(SB, `/v1/projects/${ref}/database/query`, {
@@ -335,6 +355,9 @@ async function main() {
       token: botToken,
       method: 'POST',
     });
+  // Family members use the same health menu, so it is also every friend's default.
+  if (HEALTH)
+    await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, { token: botToken, method: 'POST' });
   for (const m of richmenus)
     if (m.name === `${px}-owner`)
       await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });

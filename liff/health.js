@@ -449,6 +449,18 @@ export async function healthView(deps, params) {
   ({ h, show, call } = deps);
   document.body.classList.add('brand', 'health');
   tab = params.get('tab') || 'today';
-  S = await call('h_state');
+  try {
+    S = await call('h_state');
+  } catch (e) {
+    if (e.message !== 'health_forbidden') throw e;
+    return show(
+      h(
+        'section',
+        { class: 'card consent' },
+        h('h2', {}, '這是長輩的健康秘書'),
+        h('p', {}, '想成為家人，請長輩在「家人與設定」產生邀請碼，再到聊天室傳「家人 邀請碼」。'),
+      ),
+    );
+  }
   render();
 }
