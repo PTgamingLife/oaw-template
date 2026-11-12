@@ -256,6 +256,7 @@ async function main() {
         ref,
         '--no-verify-jwt',
         '--use-api',
+        '--yes',
         '--workdir',
         'build',
       ],
