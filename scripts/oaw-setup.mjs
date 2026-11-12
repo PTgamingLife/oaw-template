@@ -11,6 +11,8 @@ const DRY = process.argv.includes('--dry-run');
 const E = (name) => (process.env[name] ?? '').trim();
 const SB = 'https://api.supabase.com';
 const LINE = 'https://api.line.me';
+// Aprico app API (status / design / digest / secretary replies), billed per owner.
+const APRICO_URL = 'https://hhcubvixldieuwdeqnwc.supabase.co/functions/v1/line-oa-kit-runtime-ai';
 // chat_message.write lets the settings page send the setup sentence for the owner.
 const LIFF_SCOPE = ['openid', 'profile', 'chat_message.write'];
 
@@ -61,6 +63,7 @@ export function render(px, out = 'build') {
   cpSync('template/supabase/functions/_shared', `${fn}/_shared`, { recursive: true });
   cpSync('template/supabase/functions/oaw-webhook', `${fn}/${px}-webhook`, { recursive: true });
   cpSync('template/supabase/functions/oaw-api', `${fn}/${px}-api`, { recursive: true });
+  cpSync('template/supabase/functions/oaw-digest', `${fn}/${px}-digest`, { recursive: true });
   writeFileSync(`${fn}/_shared/px.ts`, `export const PX = '${px}';\n`);
   writeFileSync(`${out}/supabase/config.toml`, `project_id = "${px}-oa"\n`);
   return readFileSync('template/supabase/schema.sql', 'utf8').replaceAll('__px__', px);
@@ -256,9 +259,7 @@ async function main() {
     LIFF_URL: liffUrl,
     PAGES_ORIGIN: pagesOrigin,
     APRICO_KEY: E('OAW_APRICO_KEY'),
-    APRICO_RUNTIME_URL: E('OAW_APRICO_RUNTIME_URL'),
-    APRICO_DESIGN_URL: E('OAW_APRICO_DESIGN_URL'),
-    APRICO_STATUS_URL: E('OAW_APRICO_STATUS_URL'),
+    APRICO_URL: E('OAW_APRICO_URL') || APRICO_URL,
     APRICO_SUBSCRIBE_URL: E('OAW_APRICO_SUBSCRIBE_URL'),
   };
   await api(SB, `/v1/projects/${ref}/secrets`, {
@@ -270,7 +271,7 @@ async function main() {
   });
   step('supabase_secrets');
 
-  for (const fn of [`${px}-webhook`, `${px}-api`])
+  for (const fn of [`${px}-webhook`, `${px}-api`, `${px}-digest`])
     execFileSync(
       'supabase',
       [

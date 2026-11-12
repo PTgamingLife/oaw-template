@@ -29,8 +29,8 @@ jobs:
           OAW_SB_REF: ${{ vars.OAW_SB_REF || secrets.OAW_SB_REF }}
           OAW_SB_ORG: ${{ vars.OAW_SB_ORG }}
           OAW_SB_REGION: ${{ vars.OAW_SB_REGION }}
-          OAW_APRICO_RUNTIME_URL: ${{ vars.OAW_APRICO_RUNTIME_URL }}
-          OAW_APRICO_DESIGN_URL: ${{ vars.OAW_APRICO_DESIGN_URL }}
+          OAW_APRICO_URL: ${{ vars.OAW_APRICO_URL }}
+          OAW_APRICO_SUBSCRIBE_URL: ${{ vars.OAW_APRICO_SUBSCRIBE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           OAW_SB_DB_PASS: ${{ secrets.OAW_SB_DB_PASS }}
           OAW_LINE_MSG_ID: ${{ secrets.OAW_LINE_MSG_ID }}

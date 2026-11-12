@@ -11,11 +11,14 @@ import { lineClient, statelessToken } from '../_shared/line.ts';
 import { askCard, exampleCard, matchExample } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import {
+  bindGroup,
   bindOwner,
+  groupBound,
   env,
   loadConfig,
   ownerId,
   peekPending,
+  saveMessage,
   saveConfig,
   setPending,
   takePending,
@@ -24,9 +27,11 @@ import {
 
 const text = (t: string) => ({ type: 'text', text: t.slice(0, 5000) });
 
-async function aprico(urlName: string, body: unknown) {
-  const url = env(urlName),
-    key = env('APRICO_KEY');
+/** Aprico app API: '' = secretary reply, 'design' = config edit proposal. */
+async function aprico(route: '' | 'design', body: unknown) {
+  const base = env('APRICO_URL'),
+    key = env('APRICO_KEY'),
+    url = base && (route ? `${base}/${route}` : base);
   if (!url || !key) return { status: 503, data: null };
   const res = await fetch(url, {
     method: 'POST',
@@ -36,7 +41,28 @@ async function aprico(urlName: string, body: unknown) {
   return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
+const RECORDED = '📝 已記下，晚上 9 點會幫你整理成行程、帳務和待辦。';
+
+/** Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly digest. */
+async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
+  if (event.type !== 'message' || event.message?.type !== 'text') return;
+  const groupId: string = event.source.groupId ?? event.source.roomId ?? '';
+  const userId: string = event.source.userId ?? '';
+  if (!groupId) return;
+  const owner = await ownerId();
+  if (event.message.text.trim() === '綁定群組') {
+    if (!owner || userId !== owner) return;
+    await bindGroup(groupId);
+    await line.reply(event.replyToken, [
+      text('已開始記錄這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給你。'),
+    ]);
+    return;
+  }
+  if (await groupBound(groupId)) await saveMessage(groupId, userId === owner, event.message.text);
+}
+
 async function handle(event: any, line: ReturnType<typeof lineClient>) {
+  if (['group', 'room'].includes(event.source?.type)) return handleGroup(event, line);
   const userId: string = event.source?.type === 'user' ? event.source.userId : '';
   const replyToken: string = event.replyToken;
   if (!userId || !replyToken) return;
@@ -101,7 +127,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       return;
     }
     case 'design': {
-      const { status, data } = await aprico('APRICO_DESIGN_URL', {
+      const { status, data } = await aprico('design', {
         requestId: event.webhookEventId,
         request: intent.request.slice(0, 1500),
         config,
@@ -119,22 +145,34 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       await reply(text(`${data.summary}\n\n回覆「套用」確認，或回覆「取消」。`));
       return;
     }
-    case 'secretary': {
-      const { status, data } = await aprico('APRICO_RUNTIME_URL', {
-        requestId: event.webhookEventId,
-        text: event.message.text.slice(0, 1500),
-      });
-      if (typeof data?.reply === 'string') {
-        await reply(text(data.reply));
+    case 'secretary':
+    case 'fallback':
+      // The owner's own free text is a note for the nightly digest.
+      if (owner === userId) {
+        await saveMessage(userId, true, event.message.text);
+        await reply(text(RECORDED));
         return;
       }
-      if (status === 402 && owner && owner !== userId)
-        await line
-          .push(owner, [text('提醒：本月秘書額度已用完，好友目前只會收到預設回覆。')])
-          .catch(() => {});
-      await reply(text(config.failure));
-      return;
-    }
+      if (intent.kind === 'fallback') {
+        await reply(text(config.failure));
+        return;
+      }
+      {
+        const { status, data } = await aprico('', {
+          requestId: event.webhookEventId,
+          text: event.message.text.slice(0, 1500),
+        });
+        if (typeof data?.reply === 'string') {
+          await reply(text(data.reply));
+          return;
+        }
+        if (status === 402 && owner && owner !== userId)
+          await line
+            .push(owner, [text('提醒：本月秘書額度已用完，好友目前只會收到預設回覆。')])
+            .catch(() => {});
+        await reply(text(config.failure));
+        return;
+      }
     default:
       await reply(text(config.failure));
   }

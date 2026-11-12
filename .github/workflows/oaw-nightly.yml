@@ -1,0 +1,21 @@
+name: OAW nightly digest
+# Every day at 21:00 Taiwan time: organise the day's recorded chat into events,
+# expenses, todos and life notes, and send the owner a summary card.
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --experimental-strip-types scripts/oaw-nightly.mjs
+        env:
+          OAW_LINE_MSG_SECRET: ${{ secrets.OAW_LINE_MSG_SECRET }}

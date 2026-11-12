@@ -16,7 +16,8 @@ const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/build.ht
 
 /** Subscription state comes from Aprico; anything other than a clear "paid" counts as unpaid. */
 async function isPaid() {
-  const url = env('APRICO_STATUS_URL'),
+  const base = env('APRICO_URL'),
+    url = base && `${base}/status`,
     key = env('APRICO_KEY');
   if (!url || !key) return false;
   try {

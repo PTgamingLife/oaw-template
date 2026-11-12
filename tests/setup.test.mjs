@@ -25,6 +25,8 @@ test('render applies the prefix to SQL, function folders and px.ts', () => {
     assert.match(sql, /enable row level security/);
     assert.ok(existsSync(`${out}/supabase/functions/cafe-webhook/index.ts`));
     assert.ok(existsSync(`${out}/supabase/functions/cafe-api/index.ts`));
+    assert.ok(existsSync(`${out}/supabase/functions/cafe-digest/index.ts`));
+    assert.match(sql, /cafe_messages/);
     assert.equal(
       readFileSync(`${out}/supabase/functions/_shared/px.ts`, 'utf8'),
       "export const PX = 'cafe';\n",
