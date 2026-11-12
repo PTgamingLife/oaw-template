@@ -8,11 +8,14 @@ import {
   verifySignature,
 } from '../_shared/logic.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
+import { askCard, exampleCard, matchExample } from '../_shared/onboarding.ts';
+import { PX } from '../_shared/px.ts';
 import {
   bindOwner,
   env,
   loadConfig,
   ownerId,
+  peekPending,
   saveConfig,
   setPending,
   takePending,
@@ -57,17 +60,23 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   let intent = textIntent(event.message.text, config, owner === userId);
   if (intent.kind === 'bind') {
     if (await bindOwner(userId, intent.code)) {
-      const liff = env('LIFF_URL');
-      await reply(
-        text(
-          '已把你設定為這個帳號的管理者。\n\n' +
-            '想調整內容時，傳「修改：你的需求」給我。\n' +
-            (liff ? `建立或更新圖文選單：${liff}?view=admin` : ''),
-        ),
-      );
+      // Owner-only menu: 設定我的 AI 秘書 / 設定我的介面 (created during setup).
+      await line.linkMenuByName(userId, `${PX}-owner`).catch(() => false);
+      await setPending(userId, { onboarding: true });
+      await reply(text('已把你設定為這個帳號的管理者。'), askCard());
       return;
     }
     intent = textIntent('', config, owner === userId);
+  }
+
+  // Right after binding: answer "what should I help with?" with the closest example.
+  if (owner === userId && ((await peekPending(userId)) as any)?.onboarding) {
+    await takePending(userId);
+    const liff = env('LIFF_URL');
+    await reply(
+      exampleCard(matchExample(event.message.text), liff ? `${liff}?view=secretary` : ''),
+    );
+    return;
   }
 
   switch (intent.kind) {

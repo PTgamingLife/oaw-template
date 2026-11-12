@@ -12,7 +12,7 @@ const h = (tag, attrs = {}, ...children) => {
   for (const c of children.flat()) if (c != null) el.append(c);
   return el;
 };
-const show = (...nodes) => app.replaceChildren(...nodes);
+const show = (...nodes) => app.replaceChildren(...nodes.flat().filter((n) => n != null));
 const fail = (msg) => show(h('p', { class: 'error' }, msg));
 
 async function call(action, extra = {}) {
@@ -118,6 +118,101 @@ async function adminView(me) {
   show(h('h1', {}, '圖文選單'), canvas, status, button);
 }
 
+const exampleFor = (data, tpl) =>
+  data.examples.find((e) => e.id === (data.view === 'interface' ? 'interface' : tpl.id)) ??
+  data.examples[0];
+
+function examplePanel(data, tpl) {
+  const ex = exampleFor(data, tpl);
+  return h(
+    'div',
+    { class: 'panel' },
+    h(
+      'div',
+      { class: 'chat' },
+      h('div', { class: 'me' }, ex.chat[0]),
+      h('div', { class: 'bot' }, ex.chat[1]),
+    ),
+    h('p', {}, ex.benefit),
+    h('p', { class: 'fee' }, ex.fee),
+    h(
+      'a',
+      { class: 'btn brand', href: data.subscribeUrl, target: '_blank', rel: 'noreferrer' },
+      `訂閱月費 ${data.fee}`,
+    ),
+  );
+}
+
+function tutorialPanel(data, tpl) {
+  const send = h('button', { class: 'btn brand', type: 'button' }, '送出設定句子');
+  send.addEventListener('click', async () => {
+    try {
+      await liff.sendMessages([{ type: 'text', text: tpl.command }]);
+      liff.closeWindow();
+    } catch {
+      await navigator.clipboard?.writeText(tpl.command).catch(() => {});
+      send.textContent = '已複製，請回到聊天室貼上送出';
+    }
+  });
+  return h(
+    'div',
+    { class: 'panel' },
+    h(
+      'ol',
+      {},
+      data.tutorial.map((t) => h('li', {}, t)),
+    ),
+    h('div', { class: 'cmd' }, tpl.command),
+    send,
+  );
+}
+
+async function settingsView(view) {
+  document.body.classList.add('brand');
+  const data = await call('settings', { view });
+  const tab = (v, label) =>
+    h('a', { href: `?view=${v}`, class: v === data.view ? 'on' : '' }, label);
+  const cards = data.templates.map((tpl) => {
+    const card = h(
+      'section',
+      { class: 'card tpl' },
+      h('h3', {}, tpl.label),
+      tpl.detail ? h('p', {}, tpl.detail) : null,
+    );
+    const start = h(
+      'button',
+      { class: 'btn', type: 'button' },
+      data.paid ? '開始設定' : '看使用範例',
+    );
+    start.addEventListener('click', () => {
+      card.querySelector('.panel')?.remove();
+      card.append(data.paid ? tutorialPanel(data, tpl) : examplePanel(data, tpl));
+    });
+    card.append(start);
+    return card;
+  });
+  show(
+    h(
+      'div',
+      { class: 'brand-head' },
+      h('img', { src: 'assets/aprico-mark.png', alt: '' }),
+      h('strong', {}, 'Aprico AI 秘書'),
+    ),
+    h(
+      'nav',
+      { class: 'tabs' },
+      tab('secretary', '設定我的 AI 秘書'),
+      tab('interface', '設定我的介面'),
+    ),
+    h(
+      'span',
+      { class: data.paid ? 'chip paid' : 'chip' },
+      data.paid ? '已訂閱' : `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`,
+    ),
+    ...cards,
+  );
+}
+
 async function main() {
   if (!cfg?.liffId) return fail('這個頁面還沒完成設定。');
   await liff.init({ liffId: cfg.liffId });
@@ -127,6 +222,10 @@ async function main() {
   document.documentElement.style.setProperty('--accent', me.config.colors[0]);
   document.title = me.config.oaName || '會員中心';
   if (params.get('view') === 'admin') return adminView(me);
+  if (['secretary', 'interface'].includes(params.get('view'))) {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以進入設定。');
+    return settingsView(params.get('view'));
+  }
   const index = Number(params.get('cell'));
   const cell = params.has('cell') ? me.config.cells[index] : null;
   if (cell?.content && cell.action === 'full')

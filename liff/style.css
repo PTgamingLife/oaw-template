@@ -96,3 +96,108 @@ canvas {
 .error {
   color: #b42318;
 }
+
+/* Owner settings pages: Aprico brand (warm apricot) with the logo pattern. */
+body.brand {
+  --bg: #faf7f2;
+  --accent: #e7c5a8;
+  --text: #4a3b32;
+  --muted: #7a6a60;
+  --line: #eadfd3;
+  background: #faf7f2 url('assets/pattern.png') repeat;
+  background-size: 140px;
+}
+.brand-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.brand-head img {
+  width: 32px;
+}
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tabs a {
+  text-align: center;
+  padding: 10px;
+  border-radius: 12px;
+  background: #efe3d6;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.tabs a.on {
+  background: var(--accent);
+}
+.chip {
+  display: inline-block;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #efe3d6;
+  margin-bottom: 14px;
+}
+.chip.paid {
+  background: #d9e7d3;
+}
+.tpl h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+.tpl p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.btn.brand {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
+}
+.chat {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.chat div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  max-width: 85%;
+}
+.chat .me {
+  justify-self: end;
+  background: #efe3d6;
+}
+.chat .bot {
+  justify-self: start;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.panel {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.panel ol {
+  padding-left: 20px;
+  margin: 0 0 12px;
+  line-height: 1.7;
+}
+.cmd {
+  background: #fff;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.fee {
+  font-weight: 600;
+  margin: 8px 0 12px;
+}

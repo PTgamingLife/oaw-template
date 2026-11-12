@@ -79,6 +79,16 @@ export async function setPending(userId: string, proposal: unknown) {
     .upsert({ line_user_id: userId, proposal, created_at: new Date().toISOString() });
 }
 
+export async function peekPending(userId: string) {
+  const { data } = await db
+    .from(T('pending'))
+    .select('proposal,created_at')
+    .eq('line_user_id', userId)
+    .maybeSingle();
+  if (!data || Date.now() - new Date(data.created_at).getTime() > 30 * 60 * 1000) return null;
+  return data.proposal;
+}
+
 export async function takePending(userId: string) {
   const { data } = await db
     .from(T('pending'))

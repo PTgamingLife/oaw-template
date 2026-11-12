@@ -4,6 +4,33 @@ import { publicConfig, richMenu } from '../_shared/logic.ts';
 import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
 import { env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
+import {
+  EXAMPLES,
+  INTERFACE_TEMPLATES,
+  MONTHLY_FEE,
+  SECRETARY_TEMPLATES,
+  TUTORIAL,
+} from '../_shared/onboarding.ts';
+
+const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/build.html';
+
+/** Subscription state comes from Aprico; anything other than a clear "paid" counts as unpaid. */
+async function isPaid() {
+  const url = env('APRICO_STATUS_URL'),
+    key = env('APRICO_KEY');
+  if (!url || !key) return false;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok && (await res.json())?.paid === true;
+  } catch {
+    return false;
+  }
+}
 
 const MAX_IMAGE = 1_000_000;
 
@@ -61,6 +88,19 @@ Deno.serve(async (req) => {
         card = await member(user.sub);
       }
       return respond({ config: publicConfig(config), member: card, isOwner });
+    }
+    if (body.action === 'settings') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      const view = body.view === 'interface' ? 'interface' : 'secretary';
+      return respond({
+        view,
+        paid: await isPaid(),
+        fee: MONTHLY_FEE,
+        subscribeUrl: env('APRICO_SUBSCRIBE_URL') || DEFAULT_SUBSCRIBE_URL,
+        templates: view === 'interface' ? INTERFACE_TEMPLATES : SECRETARY_TEMPLATES,
+        examples: EXAMPLES,
+        tutorial: TUTORIAL,
+      });
     }
     if (body.action === 'publish_menu') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

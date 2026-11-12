@@ -11,6 +11,29 @@ const DRY = process.argv.includes('--dry-run');
 const E = (name) => (process.env[name] ?? '').trim();
 const SB = 'https://api.supabase.com';
 const LINE = 'https://api.line.me';
+// chat_message.write lets the settings page send the setup sentence for the owner.
+const LIFF_SCOPE = ['openid', 'profile', 'chat_message.write'];
+
+/** Owner-only rich menu (2500x843): left = AI secretary settings, right = interface settings. */
+export function ownerMenu(px, liffUrl) {
+  const half = { y: 0, width: 1250, height: 843 };
+  return {
+    size: { width: 2500, height: 843 },
+    selected: true,
+    name: `${px}-owner`,
+    chatBarText: '設定',
+    areas: [
+      {
+        bounds: { x: 0, ...half },
+        action: { type: 'uri', label: '設定我的 AI 秘書', uri: `${liffUrl}?view=secretary` },
+      },
+      {
+        bounds: { x: 1250, ...half },
+        action: { type: 'uri', label: '設定我的介面', uri: `${liffUrl}?view=interface` },
+      },
+    ],
+  };
+}
 const status = { ok: false, steps: {}, finished_at: null };
 const save = () => writeFileSync('oaw/status.json', JSON.stringify(status, null, 2) + '\n');
 const step = (name, value = 'done') => {
@@ -211,14 +234,14 @@ async function main() {
     await api(LINE, `/liff/v1/apps/${liffId}`, {
       token: loginToken,
       method: 'PUT',
-      body: { view },
+      body: { view, scope: LIFF_SCOPE },
     });
   else
     liffId = (
       await api(LINE, '/liff/v1/apps', {
         token: loginToken,
         method: 'POST',
-        body: { view, description: liffDesc, scope: ['openid', 'profile'], botPrompt: 'normal' },
+        body: { view, description: liffDesc, scope: LIFF_SCOPE, botPrompt: 'normal' },
       })
     ).liffId;
   const liffUrl = `https://liff.line.me/${liffId}`;
@@ -235,6 +258,8 @@ async function main() {
     APRICO_KEY: E('OAW_APRICO_KEY'),
     APRICO_RUNTIME_URL: E('OAW_APRICO_RUNTIME_URL'),
     APRICO_DESIGN_URL: E('OAW_APRICO_DESIGN_URL'),
+    APRICO_STATUS_URL: E('OAW_APRICO_STATUS_URL'),
+    APRICO_SUBSCRIBE_URL: E('OAW_APRICO_SUBSCRIBE_URL'),
   };
   await api(SB, `/v1/projects/${ref}/secrets`, {
     token: sbToken,
@@ -283,6 +308,35 @@ async function main() {
     status: test.statusCode ?? null,
     reason: test.reason ?? null,
   });
+
+  // Owner-only menu: replace any previous one, then relink it if an owner is already bound.
+  const { richmenus = [] } = await api(LINE, '/v2/bot/richmenu/list', { token: botToken });
+  const { richMenuId } = await api(LINE, '/v2/bot/richmenu', {
+    token: botToken,
+    method: 'POST',
+    body: ownerMenu(px, liffUrl),
+  });
+  const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
+    body: readFileSync('oaw/owner-menu.png'),
+  });
+  if (!up.ok) throw Error(`上傳擁有者選單圖片失敗（HTTP ${up.status}）`);
+  const rows = await api(SB, `/v1/projects/${ref}/database/query`, {
+    token: sbToken,
+    method: 'POST',
+    body: { query: `select line_user_id from public.${px}_owner where id = 1` },
+  });
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (/^U[0-9a-f]{32}$/.test(row?.line_user_id ?? ''))
+    await api(LINE, `/v2/bot/user/${row.line_user_id}/richmenu/${richMenuId}`, {
+      token: botToken,
+      method: 'POST',
+    });
+  for (const m of richmenus)
+    if (m.name === `${px}-owner`)
+      await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
+  step('owner_menu', row?.line_user_id ? 'linked' : 'ready');
 
   writeFileSync(
     'liff/config.js',

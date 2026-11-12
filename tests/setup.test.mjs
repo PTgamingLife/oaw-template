@@ -48,3 +48,14 @@ test('bind code accepts full-width digits, spaces and dashes', () => {
   assert.equal(normalizeBindCode('123-456'), '123456');
   assert.match(seedSql('cafe', { oaName: 'x' }, '１２３４５６'), /cafe_owner/);
 });
+
+test('owner menu splits 2500x843 into two settings links', async () => {
+  const { ownerMenu } = await import('../scripts/oaw-setup.mjs');
+  const m = ownerMenu('cafe', 'https://liff.line.me/1-a');
+  assert.equal(m.name, 'cafe-owner');
+  assert.deepEqual(
+    m.areas.map((a) => a.action.uri),
+    ['https://liff.line.me/1-a?view=secretary', 'https://liff.line.me/1-a?view=interface'],
+  );
+  assert.equal(m.areas[0].bounds.width + m.areas[1].bounds.width, 2500);
+});
