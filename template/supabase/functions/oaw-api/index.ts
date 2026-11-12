@@ -4,6 +4,7 @@ import { publicConfig, richMenu } from '../_shared/logic.ts';
 import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
 import { apricoKey, env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
+import { healthAction } from '../_shared/health-api.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
   EXAMPLES,
@@ -98,6 +99,8 @@ Deno.serve(async (req) => {
       }
       return respond({ config: publicConfig(config), member: card, isOwner });
     }
+    if (typeof body.action === 'string' && body.action.startsWith('h_'))
+      return respond(await healthAction(body.action, body, user.sub));
     if (body.action === 'settings') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       const view = body.view === 'interface' ? 'interface' : 'secretary';
@@ -127,6 +130,16 @@ Deno.serve(async (req) => {
   } catch (e) {
     const code = e instanceof Error && /^[a-z_0-9]{3,40}$/.test(e.message) ? e.message : 'failed';
     console.warn('oaw api failed:', code);
-    return respond({ error: code }, code.startsWith('image_') ? 400 : 500);
+    const status =
+      code.startsWith('image_') || code.endsWith('_invalid')
+        ? 400
+        : code === 'health_forbidden' || code === 'consent_required'
+          ? 403
+          : code === 'points_insufficient'
+            ? 402
+            : code === 'rate_limited'
+              ? 429
+              : 500;
+    return respond({ error: code }, status);
   }
 });

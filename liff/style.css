@@ -228,3 +228,224 @@ body.brand {
   background: var(--text);
   border-radius: 999px;
 }
+/* ---- 健康 AI 秘書 ---- */
+.health h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+.health h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.health .tabs {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.health .tabs a {
+  padding: 10px 4px;
+  font-size: 15px;
+}
+.health details summary {
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.health details[open] summary {
+  margin-bottom: 12px;
+}
+.health .check {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 17px;
+  border-bottom: 1px solid var(--line);
+}
+.health .check:last-child {
+  border-bottom: 0;
+}
+.health .check input {
+  width: 24px;
+  height: 24px;
+  accent-color: #4a3b32;
+}
+.health .check.done span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.health .field {
+  width: 100%;
+  font-size: 17px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+.health .seg {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.health .seg button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 15px;
+}
+.health .seg button.on {
+  background: #4a3b32;
+  color: #fff;
+  border-color: #4a3b32;
+}
+.health .stat {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.health .stat strong {
+  font-size: 20px;
+}
+.health .stat small {
+  color: var(--muted);
+}
+.health .stat.warn strong {
+  color: #b4552d;
+}
+.health .small {
+  font-size: 13px;
+}
+.health .shots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.health .shot-slot {
+  aspect-ratio: 3 / 4;
+  border: 2px dashed #d9c2ad;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 8px;
+  overflow: hidden;
+}
+.health .shot-slot span {
+  font-weight: 700;
+}
+.health .shot-slot small {
+  color: var(--muted);
+}
+.health .shot-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.health .score {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.health .score .big {
+  font-size: 44px;
+  font-weight: 800;
+  text-align: center;
+}
+.health .score .bars {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  color: var(--muted);
+}
+.health .month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+.health .month b {
+  font-size: 13px;
+  color: var(--muted);
+}
+.health .month span {
+  padding: 8px 0;
+  border-radius: 10px;
+}
+.health .month span.has {
+  background: #f1dfcf;
+  font-weight: 700;
+}
+.health .month span.today {
+  outline: 2px solid #4a3b32;
+}
+.health .event {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.health .link {
+  background: none;
+  border: 0;
+  color: #b4552d;
+  font-size: 14px;
+}
+.health .family {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.health .chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.health .chip-check {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f6ece2;
+  font-size: 14px;
+}
+.health .row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.health .row.rem {
+  grid-template-columns: 1fr 1fr;
+}
+.health .warn-text {
+  color: #b4552d;
+}
+.health .consent {
+  margin-top: 24px;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #4a3b32;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  z-index: 9;
+}

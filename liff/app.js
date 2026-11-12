@@ -241,6 +241,8 @@ async function main() {
   document.documentElement.style.setProperty('--accent', me.config.colors[0]);
   document.title = me.config.oaName || '會員中心';
   if (params.get('view') === 'admin') return adminView(me);
+  if (params.get('view') === 'health')
+    return (await import('./health.js')).healthView({ h, show, call }, params);
   if (['secretary', 'interface'].includes(params.get('view'))) {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以進入設定。');
     return settingsView(params.get('view'));
@@ -252,4 +254,11 @@ async function main() {
   show(h('h1', {}, me.config.oaName || '會員中心'), memberCard(me, profile), links(me.config));
 }
 
-if (window.liff) main().catch((e) => fail(`載入失敗（${e.message}），請關閉後重新開啟。`));
+const mock =
+  ['localhost', '127.0.0.1'].includes(location.hostname) && location.search.includes('mock=1');
+if (mock)
+  // Local preview with sample data; never active on the published site.
+  Promise.all([import('./health.js'), import('./health-mock.js')]).then(([m, d]) =>
+    m.healthView({ h, show, call: d.mockCall }, new URLSearchParams(location.search)),
+  );
+else if (window.liff) main().catch((e) => fail(`載入失敗（${e.message}），請關閉後重新開啟。`));
