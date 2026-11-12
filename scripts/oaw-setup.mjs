@@ -123,6 +123,12 @@ async function supabaseProject(token, px, previous) {
       region: E('OAW_SB_REGION') || 'ap-northeast-1',
       db_pass: E('OAW_SB_DB_PASS') || randomBytes(24).toString('base64url'),
     },
+  }).catch((e) => {
+    if (/free projects|maximum limits/i.test(e.message))
+      throw Error(
+        'Supabase 免費方案最多 2 個專案，已經滿了：請在 Variables 設定 OAW_SB_REF 使用既有專案，或到 Supabase 暫停一個不用的專案',
+      );
+    throw e;
   });
   return created.id ?? created.ref;
 }
