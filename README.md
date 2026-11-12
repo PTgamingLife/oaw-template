@@ -28,18 +28,19 @@ Aprico 的 LINE 官方帳號固定範本。客戶從這個範本建立自己的 
 
 由 Aprico 建置頁在瀏覽器加密後寫入，客戶不用手動設定。
 
-| 名稱                                              | 類型     | 必要 | 說明                                                               |
-| ------------------------------------------------- | -------- | ---- | ------------------------------------------------------------------ |
-| `SUPABASE_ACCESS_TOKEN`                           | Secret   | ✅   | Supabase Access Token                                              |
-| `OAW_LINE_MSG_ID`、`OAW_LINE_MSG_SECRET`          | Secret   | ✅   | Messaging API Channel ID 與 Secret                                 |
-| `OAW_LINE_LOGIN_ID`、`OAW_LINE_LOGIN_SECRET`      | Secret   | ✅   | LINE Login Channel ID 與 Secret（LIFF 用）                         |
-| `OAW_BIND_CODE`                                   | Secret   |      | 舊流程用。新流程不用設：建置完在 Aprico 官方 LINE 傳「連接我的OA」 |
-| `OAW_APRICO_KEY`                                  | Secret   |      | 舊流程用。新流程由「連接我的OA」自動取得並存進客戶自己的資料庫     |
-| `OAW_SB_DB_PASS`                                  | Secret   |      | 新建 Supabase 專案的資料庫密碼；沒給就隨機產生                     |
-| `OAW_PX`                                          | Variable | ✅   | 前綴                                                               |
-| `OAW_SB_REF`                                      | Variable |      | 使用既有 Supabase 專案；空白就新建                                 |
-| `OAW_SB_ORG`、`OAW_SB_REGION`                     | Variable |      | 新建專案的組織與區域（預設東京）                                   |
-| `OAW_APRICO_RUNTIME_URL`、`OAW_APRICO_DESIGN_URL` | Variable |      | Aprico 秘書與修改服務的網址                                        |
+| 名稱                                              | 類型     | 必要 | 說明                                                                   |
+| ------------------------------------------------- | -------- | ---- | ---------------------------------------------------------------------- |
+| `SUPABASE_ACCESS_TOKEN`                           | Secret   | ✅   | Supabase Access Token                                                  |
+| `OAW_LINE_MSG_ID`、`OAW_LINE_MSG_SECRET`          | Secret   | ✅   | Messaging API Channel ID 與 Secret                                     |
+| `OAW_LINE_LOGIN_ID`、`OAW_LINE_LOGIN_SECRET`      | Secret   | ✅   | LINE Login Channel ID 與 Secret（LIFF 用）                             |
+| `OAW_BIND_CODE`                                   | Secret   |      | 舊流程用。新流程不用設：建置完在 Aprico 官方 LINE 傳「連接我的OA」     |
+| `OAW_APRICO_KEY`                                  | Secret   |      | 舊流程用。新流程由「連接我的OA」自動取得並存進客戶自己的資料庫         |
+| `OAW_SB_DB_PASS`                                  | Secret   |      | 新建 Supabase 專案的資料庫密碼；沒給就隨機產生                         |
+| `OAW_PX`                                          | Variable | ✅   | 前綴                                                                   |
+| `OAW_SB_REF`                                      | Variable |      | 使用既有 Supabase 專案；空白就新建                                     |
+| `OAW_TEMPLATE`                                    | Variable |      | 填 `health` 就是「個人健康 AI 秘書」：四格健康選單、提醒排程、家人通知 |
+| `OAW_SB_ORG`、`OAW_SB_REGION`                     | Variable |      | 新建專案的組織與區域（預設東京）                                       |
+| `OAW_APRICO_RUNTIME_URL`、`OAW_APRICO_DESIGN_URL` | Variable |      | Aprico 秘書與修改服務的網址                                            |
 
 LINE 不存長效 token：每次都用 Channel ID 與 Secret 換 15 分鐘的 stateless token。
 

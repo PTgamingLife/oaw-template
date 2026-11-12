@@ -59,6 +59,7 @@ const REPORT = {
 };
 export async function mockCall(action, extra = {}) {
   await new Promise((r) => setTimeout(r, 150));
+  if (location.search.includes('forbidden=1')) throw Error('health_forbidden');
   if (action === 'h_consent') S.consent = true;
   if (action === 'h_done') S.today[extra.slot].done = true;
   if (action === 'h_measure') return { saved: '已記錄', flagged: '' };
