@@ -1,0 +1,8 @@
+{
+  "name": "oaw-template",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs"
+  }
+}

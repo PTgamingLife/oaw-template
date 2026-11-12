@@ -1,0 +1,98 @@
+:root {
+  --bg: #f7f6f2;
+  --card: #ffffff;
+  --text: #2b2b2b;
+  --muted: #6f6f6f;
+  --line: #e4e2dc;
+  --accent: #bdd0be;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+}
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
+}
+h1 {
+  font-size: 20px;
+  margin: 4px 0 16px;
+}
+.muted {
+  color: var(--muted);
+}
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.member {
+  background: var(--accent);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.member img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+.member .no {
+  font-size: 13px;
+  color: #3c3c3c;
+}
+.member .name {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 2px 0;
+}
+.content {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.links {
+  display: grid;
+  gap: 10px;
+}
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 16px;
+  text-align: center;
+  padding: 13px;
+  text-decoration: none;
+}
+.btn.primary {
+  background: #2b2b2b;
+  color: #fff;
+  border-color: #2b2b2b;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display: block;
+  margin-bottom: 12px;
+}
+.error {
+  color: #b42318;
+}
