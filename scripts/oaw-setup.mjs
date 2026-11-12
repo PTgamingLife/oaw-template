@@ -92,7 +92,13 @@ async function lineToken(id, secret) {
 async function supabaseProject(token, px, previous) {
   const known = E('OAW_SB_REF') || previous;
   if (known) return known;
-  const orgs = await api(SB, '/v1/organizations', { token });
+  const orgs = await api(SB, '/v1/organizations', { token }).catch((e) => {
+    if (/HTTP 40[13]/.test(e.message))
+      throw Error(
+        'Supabase Token 沒有建立專案的權限：請改用帳號層級的 Access Token，或在 Variables 設定 OAW_SB_REF 使用既有專案',
+      );
+    throw e;
+  });
   const org = E('OAW_SB_ORG') || orgs[0]?.id;
   if (!org) throw Error('找不到 Supabase 組織');
   const created = await api(SB, '/v1/projects', {
