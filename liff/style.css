@@ -430,6 +430,12 @@ body.brand {
 }
 .health .row.rem {
   grid-template-columns: 1fr 1fr;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.health .row.rem .field {
+  margin-bottom: 0;
 }
 .health .warn-text {
   color: #b4552d;
@@ -448,4 +454,7 @@ body.brand {
   border-radius: 999px;
   font-size: 15px;
   z-index: 9;
+}
+.health details .btn + .btn {
+  margin-top: 10px;
 }

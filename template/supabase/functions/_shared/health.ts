@@ -39,7 +39,8 @@ export function thresholds(raw: any): Thresholds {
 }
 
 export function reminders(raw: unknown): Reminder[] {
-  if (!Array.isArray(raw)) return DEFAULT_REMINDERS;
+  // A new profile starts with an empty list: use the defaults until the elder saves their own.
+  if (!Array.isArray(raw) || !raw.length) return DEFAULT_REMINDERS;
   return raw
     .filter(
       (r: any) =>

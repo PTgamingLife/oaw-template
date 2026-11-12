@@ -342,17 +342,32 @@ function family() {
     num('gluHigh', '飯前血糖 ≥'),
     num('gluLow', '血糖 ≤'),
   );
-  const rem = h(
-    'div',
-    {},
-    ...S.reminders.map((r) =>
-      h(
-        'div',
-        { class: 'row rem' },
-        input({ type: 'time', value: r.time, name: 'time' }),
-        input({ value: r.label, name: 'label', 'data-kind': r.kind }),
-      ),
-    ),
+  const remRow = (r) => {
+    const kind = h(
+      'select',
+      { class: 'field', name: 'kind' },
+      ...[
+        ['med', '吃藥'],
+        ['measure', '量測'],
+      ].map(([v, l]) => h('option', { value: v, ...(v === r.kind ? { selected: '' } : {}) }, l)),
+    );
+    const row = h(
+      'div',
+      { class: 'row rem' },
+      input({ type: 'time', value: r.time, name: 'time' }),
+      kind,
+      input({ value: r.label, name: 'label', placeholder: '例如：早餐後吃藥' }),
+      button('刪除', () => row.remove(), 'link'),
+    );
+    return row;
+  };
+  const rem = h('div', {}, ...S.reminders.map(remRow));
+  const addRem = button(
+    '＋ 新增提醒',
+    () =>
+      rem.querySelectorAll('.rem').length < 8 &&
+      rem.append(remRow({ time: '12:00', kind: 'med', label: '' })),
+    'btn',
   );
   const doSave = () => {
     const thresholds = Object.fromEntries(
@@ -360,7 +375,7 @@ function family() {
     );
     const reminders = [...rem.querySelectorAll('.rem')].map((row) => {
       const [t, l] = row.querySelectorAll('input');
-      return { time: t.value, label: l.value, kind: l.dataset.kind };
+      return { time: t.value, label: l.value, kind: row.querySelector('select').value };
     });
     run('h_settings', { thresholds, reminders }).then(() => (toast('已儲存'), render()));
   };
@@ -418,7 +433,7 @@ function family() {
         'btn',
       ),
     ),
-    h('details', { class: 'card' }, h('summary', {}, '提醒時間'), rem, save()),
+    h('details', { class: 'card' }, h('summary', {}, '提醒時間'), rem, addRem, save()),
     h('details', { class: 'card' }, h('summary', {}, '異常範圍'), ranges, save()),
   ];
 }
