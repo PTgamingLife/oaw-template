@@ -5,14 +5,13 @@ import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
 import { env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
 import {
+  DEFAULT_SUBSCRIBE_URL,
   EXAMPLES,
   INTERFACE_TEMPLATES,
   MONTHLY_FEE,
   SECRETARY_TEMPLATES,
   TUTORIAL,
 } from '../_shared/onboarding.ts';
-
-const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/build.html';
 
 type Quota = { paid: boolean; percentLeft?: number; extraTwdLeft?: number; paidUntil?: string };
 

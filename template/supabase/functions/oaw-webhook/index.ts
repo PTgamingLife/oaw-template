@@ -8,7 +8,13 @@ import {
   verifySignature,
 } from '../_shared/logic.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
-import { askCard, exampleCard, matchExample, noticeCard } from '../_shared/onboarding.ts';
+import {
+  askCard,
+  exampleCard,
+  matchExample,
+  noticeCard,
+  quotaCard,
+} from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import {
   bindGroup,
@@ -16,6 +22,7 @@ import {
   groupBound,
   env,
   loadConfig,
+  onceToday,
   ownerId,
   peekPending,
   saveMessage,
@@ -142,7 +149,11 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         config,
       });
       if (status === 402) {
-        await reply(noticeCard('本月額度已用完', '加購或下個月額度更新後就能繼續修改。'));
+        await reply(quotaCard(env('APRICO_SUBSCRIBE_URL')));
+        return;
+      }
+      if (status === 429) {
+        await reply(noticeCard('請稍等一下', '短時間內的修改太多了，請一分鐘後再試。'));
         return;
       }
       if (!data?.config || typeof data.summary !== 'string') {
@@ -177,9 +188,13 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           await reply(noticeCard(config.oaName || 'AI 秘書', data.reply));
           return;
         }
-        if (status === 402 && owner && owner !== userId)
+        // Remind the owner at most once a day, not on every friend message.
+        if (status === 402 && owner && owner !== userId && (await onceToday('quota')))
           await line
-            .push(owner, [noticeCard('額度提醒', '本月秘書額度已用完，好友目前只會收到預設回覆。')])
+            .push(owner, [
+              noticeCard('額度提醒', '本月秘書額度已用完，好友目前只會收到預設回覆。'),
+              quotaCard(env('APRICO_SUBSCRIBE_URL')),
+            ])
             .catch(() => {});
         await reply(noticeCard(config.oaName || '小提醒', config.failure));
         return;

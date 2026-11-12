@@ -226,6 +226,17 @@ export const TUTORIAL = [
 ];
 
 /** Every secretary reply is a small branded card instead of plain text. */
+export const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/build.html';
+
+/** Shown when the month's quota, the free NT$20 extra and any top-up are all used. */
+export function quotaCard(subscribeUrl: string) {
+  return noticeCard(
+    '本月額度已用完',
+    '本月額度和每月贈送的 NT$20 加值都用完了。加值 NT$30–50 就能馬上繼續使用；不加值的話，下個月額度會自動恢復。',
+    { label: '加值額度', uri: subscribeUrl || DEFAULT_SUBSCRIBE_URL },
+  );
+}
+
 export function noticeCard(title: string, body: string, button?: { label: string; uri: string }) {
   return {
     type: 'flex',

@@ -101,6 +101,22 @@ export async function takePending(userId: string) {
   return row.proposal;
 }
 
+/** True only the first time `key` is seen on a Taipei calendar day (stored in the pending table). */
+export async function onceToday(key: string) {
+  const id = `notice:${key}`,
+    day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const { data } = await db
+    .from(T('pending'))
+    .select('proposal')
+    .eq('line_user_id', id)
+    .maybeSingle();
+  if (data?.proposal?.day === day) return false;
+  await db
+    .from(T('pending'))
+    .upsert({ line_user_id: id, proposal: { day }, created_at: new Date().toISOString() });
+  return true;
+}
+
 // ---- Chat auto-record ----
 export async function bindGroup(groupId: string) {
   await db.from(T('groups')).upsert({ group_id: groupId });

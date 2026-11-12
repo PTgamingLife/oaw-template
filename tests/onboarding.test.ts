@@ -6,6 +6,7 @@ import {
   exampleCard,
   matchExample,
   SECRETARY_TEMPLATES,
+  quotaCard,
 } from '../template/supabase/functions/_shared/onboarding.ts';
 
 test('free text maps to the closest example', () => {
@@ -57,4 +58,17 @@ test('example card carries the ready-made app screenshot when Pages is known', a
 test('every example has a screenshot file', async () => {
   const { existsSync } = await import('node:fs');
   for (const e of EXAMPLES) assert.ok(existsSync(`liff/assets/examples/${e.id}.jpg`), e.id);
+});
+
+test('quota card offers a top-up and falls back to the default subscribe page', () => {
+  const card: any = quotaCard('');
+  assert.match(card.altText, /NT\$30–50/);
+  assert.equal(
+    card.contents.footer.contents[0].action.uri,
+    'https://liff.line.me/2012197506-Vmb4O5iT/build.html',
+  );
+  assert.equal(
+    quotaCard('https://x.example/topup').contents.footer.contents[0].action.uri,
+    'https://x.example/topup',
+  );
 });
