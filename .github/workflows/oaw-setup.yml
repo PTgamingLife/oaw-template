@@ -25,8 +25,8 @@ jobs:
       - name: Build the OA app
         run: node --experimental-strip-types scripts/oaw-setup.mjs
         env:
-          OAW_PX: ${{ vars.OAW_PX }}
-          OAW_SB_REF: ${{ vars.OAW_SB_REF }}
+          OAW_PX: ${{ vars.OAW_PX || secrets.OAW_PX }}
+          OAW_SB_REF: ${{ vars.OAW_SB_REF || secrets.OAW_SB_REF }}
           OAW_SB_ORG: ${{ vars.OAW_SB_ORG }}
           OAW_SB_REGION: ${{ vars.OAW_SB_REGION }}
           OAW_APRICO_RUNTIME_URL: ${{ vars.OAW_APRICO_RUNTIME_URL }}
