@@ -71,7 +71,20 @@ async function api(base, path, { token, method = 'GET', body, form } = {}) {
     signal: AbortSignal.timeout(60_000),
   });
   const text = await res.text();
-  if (!res.ok) throw Error(`${new URL(base).host}${path.split('?')[0]} → HTTP ${res.status}`);
+  if (!res.ok) {
+    // Error bodies from these APIs carry a reason (never our secrets); keep a short, single-line part.
+    let reason = '';
+    try {
+      const j = JSON.parse(text);
+      reason = j.message ?? j.error_description ?? j.error ?? '';
+    } catch {
+      reason = text;
+    }
+    reason = String(reason).replace(/\s+/g, ' ').slice(0, 200);
+    throw Error(
+      `${new URL(base).host}${path.split('?')[0]} → HTTP ${res.status}${reason ? `：${reason}` : ''}`,
+    );
+  }
   return text ? JSON.parse(text) : {};
 }
 
