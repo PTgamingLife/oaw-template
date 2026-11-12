@@ -61,6 +61,6 @@ npm test   # 單元測試（Node 22，不連網）
 OAW_PX=demo GITHUB_REPOSITORY=me/demo-oa node --experimental-strip-types scripts/oaw-setup.mjs --dry-run
 ```
 
-## 舊檔案
+## 舊文件
 
-`oaw/serve.sh`、`oaw/oaw_server.py`、`oaw/tutorial.md`、`oaw/web/` 是先前 Cloud Shell 手機測試用的檔案；`docs/oaw-spec.md` 是先前精靈網頁的規格。兩者都已被 Aprico 的 `docs/SIMPLIFIED-FLOW.md` 取代。
+`docs/oaw-spec.md` 是先前精靈網頁的規格，已被 Aprico 的 `docs/SIMPLIFIED-FLOW.md` 取代。
