@@ -35,6 +35,28 @@ export async function ownerId(): Promise<string> {
   return data?.line_user_id ?? '';
 }
 
+/** Aprico key: saved by the one-tap connect, or the setup secret for older installs. */
+export async function apricoKey(): Promise<string> {
+  const { data } = await db.from(T('owner')).select('aprico_key').eq('id', 1).maybeSingle();
+  return data?.aprico_key || env('APRICO_KEY');
+}
+
+/**
+ * Save the key from a one-tap connect. The sender becomes the owner when none is bound yet;
+ * an already bound owner can only be refreshed by that same owner. Returns true on success.
+ */
+export async function connectOwner(userId: string, key: string) {
+  if (!/^U[0-9a-f]{32}$/.test(userId)) return false;
+  await db.from(T('owner')).upsert({ id: 1 }, { onConflict: 'id', ignoreDuplicates: true });
+  const { data } = await db
+    .from(T('owner'))
+    .update({ line_user_id: userId, aprico_key: key, bind_hash: null, bind_expires: null })
+    .eq('id', 1)
+    .or(`line_user_id.is.null,line_user_id.eq.${userId}`)
+    .select('id');
+  return Boolean(data?.length);
+}
+
 /** Bind the owner with the one-time code from the build page. Returns true on success. */
 export async function bindOwner(userId: string, code: string) {
   const { data } = await db

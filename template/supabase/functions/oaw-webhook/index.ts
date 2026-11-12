@@ -17,8 +17,10 @@ import {
 } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import {
+  apricoKey,
   bindGroup,
   bindOwner,
+  connectOwner,
   groupBound,
   env,
   loadConfig,
@@ -35,7 +37,7 @@ import {
 /** Aprico app API: '' = secretary reply, 'design' = config edit proposal. */
 async function aprico(route: '' | 'design', body: unknown) {
   const base = env('APRICO_URL'),
-    key = env('APRICO_KEY'),
+    key = await apricoKey(),
     url = base && (route ? `${base}/${route}` : base);
   if (!url || !key) return { status: 503, data: null };
   const res = await fetch(url, {
@@ -92,6 +94,41 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
 
   const owner = await ownerId();
   let intent = textIntent(event.message.text, config, owner === userId);
+  if (intent.kind === 'connect') {
+    if (owner && owner !== userId) {
+      await reply(noticeCard('無法連接', '這個帳號已經有管理者了。'));
+      return;
+    }
+    const base = env('APRICO_URL');
+    const res = base
+      ? await fetch(`${base}/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: intent.code }),
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => null)
+      : null;
+    const key = res?.ok ? (await res.json().catch(() => null))?.key : null;
+    if (typeof key !== 'string' || !/^aprico_[a-f0-9]{64}$/.test(key)) {
+      await reply(
+        noticeCard('連接碼無效', '連接碼可能已過期或用過了，請回 Aprico 官方 LINE 重新取得。'),
+      );
+      return;
+    }
+    if (!(await connectOwner(userId, key))) {
+      await reply(noticeCard('無法連接', '這個帳號已經有管理者了。'));
+      return;
+    }
+    await line.linkMenuByName(userId, `${PX}-owner`).catch(() => false);
+    if (!owner) {
+      await setPending(userId, { onboarding: true });
+      await reply(
+        noticeCard('✅ 連接完成', '你已是這個帳號的管理者，AI 秘書也啟用了。'),
+        askCard(),
+      );
+    } else await reply(noticeCard('✅ 連接完成', 'AI 秘書已重新連接。'));
+    return;
+  }
   if (intent.kind === 'bind') {
     if (await bindOwner(userId, intent.code)) {
       // Owner-only menu: 設定我的 AI 秘書 / 設定我的介面 (created during setup).

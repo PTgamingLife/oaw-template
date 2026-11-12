@@ -14,6 +14,8 @@ create table if not exists public.__px___owner (
   bind_hash text,
   bind_expires timestamptz
 );
+-- Saved by the one-tap connect from the Aprico OA.
+alter table public.__px___owner add column if not exists aprico_key text;
 
 create table if not exists public.__px___members (
   line_user_id text primary key,

@@ -96,6 +96,7 @@ export async function sha256Hex(text: string) {
 
 export type Intent =
   | { kind: 'bind'; code: string }
+  | { kind: 'connect'; code: string }
   | { kind: 'cell'; index: number }
   | { kind: 'apply' }
   | { kind: 'cancel' }
@@ -107,6 +108,9 @@ export type Intent =
 export function textIntent(text: string, config: Config, isOwner: boolean): Intent {
   const t = text.trim();
   if (/^\d{6}$/.test(t)) return { kind: 'bind', code: t };
+  // One-tap connect from the Aprico OA: 「連接 ABCDEFGHJK」.
+  const connect = t.match(/^連接\s*([A-HJ-NP-Z2-9]{10})$/i);
+  if (connect) return { kind: 'connect', code: connect[1].toUpperCase() };
   if (isOwner && t === '套用') return { kind: 'apply' };
   if (isOwner && t === '取消') return { kind: 'cancel' };
   const design = t.match(/^(?:設計|修改)[:：\s]\s*(.+)$/s);

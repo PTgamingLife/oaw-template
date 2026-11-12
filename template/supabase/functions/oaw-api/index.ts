@@ -2,7 +2,7 @@
 // carries a LIFF ID token that is verified with LINE before anything is returned.
 import { publicConfig, richMenu } from '../_shared/logic.ts';
 import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
-import { env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
+import { apricoKey, env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
@@ -19,7 +19,7 @@ type Quota = { paid: boolean; percentLeft?: number; extraTwdLeft?: number; paidU
 async function quota(): Promise<Quota> {
   const base = env('APRICO_URL'),
     url = base && `${base}/status`,
-    key = env('APRICO_KEY');
+    key = await apricoKey();
   if (!url || !key) return { paid: false };
   try {
     const res = await fetch(url, {

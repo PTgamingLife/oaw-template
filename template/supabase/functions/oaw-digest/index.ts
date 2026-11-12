@@ -5,6 +5,7 @@ import { lineClient, statelessToken } from '../_shared/line.ts';
 import { digestCard, digestKey, digestRows } from '../_shared/digest.ts';
 import { noticeCard, quotaCard } from '../_shared/onboarding.ts';
 import {
+  apricoKey,
   env,
   markProcessed,
   onceToday,
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
 
   await purgeOldMessages();
   const base = env('APRICO_URL'),
-    key = env('APRICO_KEY'),
+    key = await apricoKey(),
     owner = await ownerId();
   if (!base || !key || !owner) return json({ skipped: 'not_configured' });
   const msgs = await pendingMessages();

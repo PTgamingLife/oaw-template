@@ -101,3 +101,16 @@ test('public config exposes only menu data', () => {
   assert.deepEqual(Object.keys(pub).sort(), ['cells', 'colors', 'grid', 'oaName', 'theme']);
   assert.equal(pub.cells.length, 4);
 });
+
+test('connect codes from the Aprico OA are recognised for anyone', () => {
+  const cfg = JSON.parse(readFileSync(new URL('../oaw/config.json', import.meta.url), 'utf8'));
+  assert.deepEqual(textIntent('連接 abcdefghjk', cfg, false), {
+    kind: 'connect',
+    code: 'ABCDEFGHJK',
+  });
+  assert.deepEqual(textIntent('連接ABCDEFGHJK', cfg, false), {
+    kind: 'connect',
+    code: 'ABCDEFGHJK',
+  });
+  assert.notEqual(textIntent('連接 ABCDEFGHJ0', cfg, false).kind, 'connect');
+});
