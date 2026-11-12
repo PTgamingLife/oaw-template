@@ -168,6 +168,26 @@ function tutorialPanel(data, tpl) {
   );
 }
 
+/** Users see percentages only; the extra bar (grace + top-up) shows sale-price NT$. */
+function quotaBars(data) {
+  const bar = (label, value, pct) =>
+    h(
+      'div',
+      { class: 'quota' },
+      h('div', { class: 'quota-row' }, h('span', {}, label), h('strong', {}, value)),
+      h('div', { class: 'quota-track' }, h('div', { class: 'quota-fill', style: `width:${pct}%` })),
+    );
+  return h(
+    'section',
+    { class: 'card' },
+    bar('本月額度', `剩 ${data.percentLeft}%`, data.percentLeft),
+    data.extraTwdLeft
+      ? bar('加值額度', `剩 NT$${data.extraTwdLeft}`, Math.min(100, (data.extraTwdLeft / 50) * 100))
+      : null,
+    data.paidUntil ? h('p', { class: 'muted' }, `訂閱到 ${data.paidUntil}`) : null,
+  );
+}
+
 async function settingsView(view) {
   document.body.classList.add('brand');
   const data = await call('settings', { view });
@@ -205,11 +225,9 @@ async function settingsView(view) {
       tab('secretary', '設定我的 AI 秘書'),
       tab('interface', '設定我的介面'),
     ),
-    h(
-      'span',
-      { class: data.paid ? 'chip paid' : 'chip' },
-      data.paid ? '已訂閱' : `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`,
-    ),
+    data.paid
+      ? quotaBars(data)
+      : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`),
     ...cards,
   );
 }

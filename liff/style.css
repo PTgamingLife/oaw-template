@@ -208,3 +208,23 @@ body.brand {
   margin-bottom: 10px;
   display: block;
 }
+.quota {
+  margin-bottom: 10px;
+}
+.quota-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.quota-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #efe3d6;
+  overflow: hidden;
+}
+.quota-fill {
+  height: 100%;
+  background: var(--text);
+  border-radius: 999px;
+}
