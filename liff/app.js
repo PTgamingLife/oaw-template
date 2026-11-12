@@ -127,6 +127,7 @@ function examplePanel(data, tpl) {
   return h(
     'div',
     { class: 'panel' },
+    h('img', { class: 'shot', src: `assets/examples/${ex.id}.jpg`, alt: `${ex.label}範例畫面` }),
     h(
       'div',
       { class: 'chat' },

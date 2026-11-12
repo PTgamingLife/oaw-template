@@ -37,3 +37,24 @@ test('example card shows the chat, benefit and settings button', () => {
 test('secretary templates exclude interface design', () => {
   assert.ok(!SECRETARY_TEMPLATES.some((t) => t.id === 'interface'));
 });
+
+test('example card carries the ready-made app screenshot when Pages is known', async () => {
+  const { exampleCard, exampleImage, noticeCard } = await import(
+    '../template/supabase/functions/_shared/onboarding.ts'
+  );
+  assert.equal(
+    exampleImage('https://me.github.io/oa', 'health'),
+    'https://me.github.io/oa/assets/examples/health.jpg',
+  );
+  const card = exampleCard(EXAMPLES[1], '', 'https://me.github.io/oa/') as any;
+  assert.equal(card.contents.hero.url, 'https://me.github.io/oa/assets/examples/expense.jpg');
+  assert.equal((exampleCard(EXAMPLES[1], '') as any).contents.hero, undefined);
+  const n = noticeCard('已記下', '內容', { label: '開啟', uri: 'https://x' }) as any;
+  assert.equal(n.type, 'flex');
+  assert.equal(n.contents.footer.contents[0].action.uri, 'https://x');
+});
+
+test('every example has a screenshot file', async () => {
+  const { existsSync } = await import('node:fs');
+  for (const e of EXAMPLES) assert.ok(existsSync(`liff/assets/examples/${e.id}.jpg`), e.id);
+});

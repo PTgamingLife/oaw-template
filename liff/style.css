@@ -201,3 +201,10 @@ body.brand {
   font-weight: 600;
   margin: 8px 0 12px;
 }
+.shot {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+  display: block;
+}

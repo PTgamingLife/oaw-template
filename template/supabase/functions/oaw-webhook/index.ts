@@ -8,7 +8,7 @@ import {
   verifySignature,
 } from '../_shared/logic.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
-import { askCard, exampleCard, matchExample } from '../_shared/onboarding.ts';
+import { askCard, exampleCard, matchExample, noticeCard } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import {
   bindGroup,
@@ -25,8 +25,6 @@ import {
   upsertMember,
 } from '../_shared/store.ts';
 
-const text = (t: string) => ({ type: 'text', text: t.slice(0, 5000) });
-
 /** Aprico app API: '' = secretary reply, 'design' = config edit proposal. */
 async function aprico(route: '' | 'design', body: unknown) {
   const base = env('APRICO_URL'),
@@ -41,7 +39,7 @@ async function aprico(route: '' | 'design', body: unknown) {
   return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
-const RECORDED = '📝 已記下，晚上 9 點會幫你整理成行程、帳務和待辦。';
+const RECORDED = '晚上 9 點會幫你整理成行程、帳務和待辦。';
 
 /** Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly digest. */
 async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
@@ -54,7 +52,10 @@ async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
     if (!owner || userId !== owner) return;
     await bindGroup(groupId);
     await line.reply(event.replyToken, [
-      text('已開始記錄這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給你。'),
+      noticeCard(
+        '📝 開始記錄這個群組',
+        '這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給你。',
+      ),
     ]);
     return;
   }
@@ -72,7 +73,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   if (event.type === 'follow') {
     const profile = await line.profile(userId).catch(() => ({ displayName: '' }));
     await upsertMember(userId, profile.displayName ?? '');
-    if (config.welcome) await reply(text(config.welcome));
+    if (config.welcome) await reply(noticeCard(config.oaName || '歡迎', config.welcome));
     return;
   }
   if (event.type === 'postback') {
@@ -89,7 +90,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       // Owner-only menu: 設定我的 AI 秘書 / 設定我的介面 (created during setup).
       await line.linkMenuByName(userId, `${PX}-owner`).catch(() => false);
       await setPending(userId, { onboarding: true });
-      await reply(text('已把你設定為這個帳號的管理者。'), askCard());
+      await reply(noticeCard('✅ 綁定完成', '已把你設定為這個帳號的管理者。'), askCard());
       return;
     }
     intent = textIntent('', config, owner === userId);
@@ -100,7 +101,11 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     await takePending(userId);
     const liff = env('LIFF_URL');
     await reply(
-      exampleCard(matchExample(event.message.text), liff ? `${liff}?view=secretary` : ''),
+      exampleCard(
+        matchExample(event.message.text),
+        liff ? `${liff}?view=secretary` : '',
+        env('PAGES_URL'),
+      ),
     );
     return;
   }
@@ -111,18 +116,22 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       return;
     case 'cancel':
       await takePending(userId);
-      await reply(text('已取消這次修改。'));
+      await reply(noticeCard('已取消', '這次修改不會套用。'));
       return;
     case 'apply': {
       const proposal = (await takePending(userId)) as { config?: unknown } | null;
       if (!proposal?.config) {
-        await reply(text('目前沒有待套用的修改。'));
+        await reply(noticeCard('沒有待套用的修改', '想調整時，傳「修改：你的需求」給我。'));
         return;
       }
       await saveConfig(validateConfig(proposal.config));
       const liff = env('LIFF_URL');
       await reply(
-        text('已套用。' + (liff ? `\n選單有變更的話，請開啟這裡重新發布：${liff}?view=admin` : '')),
+        noticeCard(
+          '✅ 已套用',
+          '新的設定已經生效。選單有變更的話，請重新發布選單。',
+          liff ? { label: '重新發布選單', uri: `${liff}?view=admin` } : undefined,
+        ),
       );
       return;
     }
@@ -133,16 +142,18 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         config,
       });
       if (status === 402) {
-        await reply(text('本月額度已用完，請到 Aprico 加購後再試。'));
+        await reply(noticeCard('本月額度已用完', '加購或下個月額度更新後就能繼續修改。'));
         return;
       }
       if (!data?.config || typeof data.summary !== 'string') {
-        await reply(text('修改功能目前無法使用，請稍後再試。'));
+        await reply(noticeCard('暫時無法修改', '修改功能目前無法使用，請稍後再試。'));
         return;
       }
       const proposed = validateConfig(data.config);
       await setPending(userId, { config: proposed });
-      await reply(text(`${data.summary}\n\n回覆「套用」確認，或回覆「取消」。`));
+      await reply(
+        noticeCard('🎨 修改提案', `${data.summary}\n\n回覆「套用」確認，或回覆「取消」。`),
+      );
       return;
     }
     case 'secretary':
@@ -150,11 +161,11 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       // The owner's own free text is a note for the nightly digest.
       if (owner === userId) {
         await saveMessage(userId, true, event.message.text);
-        await reply(text(RECORDED));
+        await reply(noticeCard('📝 已記下', RECORDED));
         return;
       }
       if (intent.kind === 'fallback') {
-        await reply(text(config.failure));
+        await reply(noticeCard(config.oaName || '小提醒', config.failure));
         return;
       }
       {
@@ -163,18 +174,18 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           text: event.message.text.slice(0, 1500),
         });
         if (typeof data?.reply === 'string') {
-          await reply(text(data.reply));
+          await reply(noticeCard(config.oaName || 'AI 秘書', data.reply));
           return;
         }
         if (status === 402 && owner && owner !== userId)
           await line
-            .push(owner, [text('提醒：本月秘書額度已用完，好友目前只會收到預設回覆。')])
+            .push(owner, [noticeCard('額度提醒', '本月秘書額度已用完，好友目前只會收到預設回覆。')])
             .catch(() => {});
-        await reply(text(config.failure));
+        await reply(noticeCard(config.oaName || '小提醒', config.failure));
         return;
       }
     default:
-      await reply(text(config.failure));
+      await reply(noticeCard(config.oaName || '小提醒', config.failure));
   }
 }
 

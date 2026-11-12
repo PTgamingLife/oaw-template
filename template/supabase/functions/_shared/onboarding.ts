@@ -133,13 +133,29 @@ const bubble = (text: string, mine: boolean) => ({
   contents: [{ type: 'text', text, wrap: true, size: 'sm', align: mine ? 'end' : 'start' }],
 });
 
+/** Screenshot of the matching ready-made LIFF app, served from the app's GitHub Pages. */
+export const exampleImage = (pagesUrl: string, id: string) =>
+  pagesUrl ? `${pagesUrl.replace(/\/?$/, '/')}assets/examples/${id}.jpg` : '';
+
 /** Example card for one use case, ending with a button to the settings page. */
-export function exampleCard(ex: Example, settingsUrl: string) {
+export function exampleCard(ex: Example, settingsUrl: string, pagesUrl = '') {
+  const image = exampleImage(pagesUrl, ex.id);
   return {
     type: 'flex',
     altText: `${ex.label}的使用範例`,
     contents: {
       type: 'bubble',
+      ...(image
+        ? {
+            hero: {
+              type: 'image',
+              url: image,
+              size: 'full',
+              aspectRatio: '3:4',
+              aspectMode: 'cover',
+            },
+          }
+        : {}),
       header: {
         type: 'box',
         layout: 'vertical',
@@ -208,3 +224,47 @@ export const TUTORIAL = [
   '秘書會回覆修改內容與這次使用的額度。',
   '確認沒問題，回覆「套用」就完成。',
 ];
+
+/** Every secretary reply is a small branded card instead of plain text. */
+export function noticeCard(title: string, body: string, button?: { label: string; uri: string }) {
+  return {
+    type: 'flex',
+    altText: `${title}：${body}`.slice(0, 400),
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: BRAND.accent,
+        paddingAll: '12px',
+        contents: [{ type: 'text', text: title, weight: 'bold', color: BRAND.ink }],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: BRAND.paper,
+        contents: [
+          { type: 'text', text: body.slice(0, 2000), wrap: true, size: 'sm', color: BRAND.ink },
+        ],
+      },
+      ...(button
+        ? {
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: BRAND.ink,
+                  height: 'sm',
+                  action: { type: 'uri', label: button.label.slice(0, 20), uri: button.uri },
+                },
+              ],
+            },
+          }
+        : {}),
+    },
+  };
+}

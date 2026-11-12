@@ -258,6 +258,7 @@ async function main() {
     LINE_LOGIN_ID: login.id,
     LIFF_URL: liffUrl,
     PAGES_ORIGIN: pagesOrigin,
+    PAGES_URL: pagesUrl,
     APRICO_KEY: E('OAW_APRICO_KEY'),
     APRICO_URL: E('OAW_APRICO_URL') || APRICO_URL,
     APRICO_SUBSCRIBE_URL: E('OAW_APRICO_SUBSCRIBE_URL'),
