@@ -11,7 +11,8 @@ test('inputs validate the prefix and derive the Pages URL', () => {
     pagesOrigin: 'https://someone.github.io',
     pagesUrl: 'https://someone.github.io/cafe-oa/',
   });
-  for (const px of ['', 'a', '1abc', 'Cafe', 'toolongname', 'ca-fe'])
+  assert.equal(inputs({ ...env, OAW_PX: ' Cafe ' }).px, 'cafe');
+  for (const px of ['', 'a', '1abc', 'toolongname', 'ca-fe'])
     assert.throws(() => inputs({ ...env, OAW_PX: px }));
 });
 

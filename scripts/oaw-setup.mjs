@@ -20,7 +20,8 @@ const step = (name, value = 'done') => {
 };
 
 export function inputs(env = process.env) {
-  const px = (env.OAW_PX ?? '').trim();
+  // Lowercase so a phone keyboard's automatic capital ("Test1") still works.
+  const px = (env.OAW_PX ?? '').trim().toLowerCase();
   if (!/^[a-z][a-z0-9]{1,7}$/.test(px)) throw Error('OAW_PX 必須是 2–8 個小寫英數字，字母開頭');
   const repo = (env.GITHUB_REPOSITORY ?? '').trim();
   const [owner, name] = repo.split('/');
