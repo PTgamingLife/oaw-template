@@ -44,7 +44,15 @@ export function render(px, out = 'build') {
 }
 
 /** SQL that seeds the config once and arms the one-time owner binding code. */
-export function seedSql(px, config, bindCode) {
+/** Accept full-width digits and stray spaces or dashes typed on a phone. */
+export function normalizeBindCode(raw = '') {
+  return String(raw)
+    .replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
+    .replace(/[\s-]/g, '');
+}
+
+export function seedSql(px, config, rawBindCode) {
+  const bindCode = normalizeBindCode(rawBindCode);
   const json = JSON.stringify(config);
   if (json.includes('$oaw$')) throw Error('config contains a reserved sequence');
   let sql = `insert into public.${px}_config (id, data) values (1, $oaw$${json}$oaw$::jsonb) on conflict (id) do nothing;\n`;

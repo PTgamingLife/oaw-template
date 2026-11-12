@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { inputs, render, seedSql } from '../scripts/oaw-setup.mjs';
+import { inputs, normalizeBindCode, render, seedSql } from '../scripts/oaw-setup.mjs';
 
 test('inputs validate the prefix and derive the Pages URL', () => {
   const env = { OAW_PX: 'cafe', GITHUB_REPOSITORY: 'Someone/cafe-oa' };
@@ -41,4 +41,10 @@ test('seed SQL stores only a hash of the bind code and never overwrites a bound 
   assert.match(sql, /where public\.cafe_owner\.line_user_id is null/);
   assert.throws(() => seedSql('cafe', { oaName: 'x' }, '12345'));
   assert.throws(() => seedSql('cafe', { oaName: '$oaw$' }, ''));
+});
+
+test('bind code accepts full-width digits, spaces and dashes', () => {
+  assert.equal(normalizeBindCode('１２３ ４５６'), '123456');
+  assert.equal(normalizeBindCode('123-456'), '123456');
+  assert.match(seedSql('cafe', { oaName: 'x' }, '１２３４５６'), /cafe_owner/);
 });
