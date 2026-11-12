@@ -199,7 +199,11 @@ async function main() {
   step('database');
 
   const liffDesc = `${px}-main`;
-  const { apps = [] } = await api(LINE, '/liff/v1/apps', { token: loginToken });
+  // LINE answers 404 (not an empty list) when the channel has no LIFF app yet.
+  const { apps = [] } = await api(LINE, '/liff/v1/apps', { token: loginToken }).catch((e) => {
+    if (/HTTP 404/.test(e.message)) return {};
+    throw e;
+  });
   const view = { type: 'full', url: pagesUrl };
   const existing = apps.find((a) => a.description === liffDesc);
   let liffId = existing?.liffId;
