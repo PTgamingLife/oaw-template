@@ -365,7 +365,7 @@ async function main() {
 
   writeFileSync(
     'liff/config.js',
-    `window.OAW = ${JSON.stringify({ px, liffId, api: `${fnBase}/${px}-api` })};\n`,
+    `window.OAW = ${JSON.stringify({ px, liffId, api: `${fnBase}/${px}-api`, basicId: status.basic_id })};\n`,
   );
   step('liff_config');
   status.ok = true;

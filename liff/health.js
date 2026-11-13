@@ -321,6 +321,71 @@ function calendar() {
 }
 
 // ---- 家人與設定 ----
+/** Invite card sent through LINE's share picker; 「加入」 opens this OA with the code filled in. */
+function inviteCard(r) {
+  const basicId = window.OAW?.basicId;
+  const uri = basicId
+    ? `https://line.me/R/oaMessage/${encodeURIComponent(basicId)}/?${encodeURIComponent(r.text)}`
+    : null;
+  return {
+    type: 'flex',
+    altText: `邀請你成為家人，傳「${r.text}」加入`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#E7C5A8',
+        contents: [{ type: 'text', text: '👪 邀請你成為家人', weight: 'bold', color: '#4A3B32' }],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#FAF7F2',
+        contents: [
+          {
+            type: 'text',
+            wrap: true,
+            size: 'sm',
+            color: '#4A3B32',
+            text: `加入後可以收到我同意分享的健康提醒與週報。\n\n按「加入」後直接送出「${r.text}」就完成（24 小時內有效）。`,
+          },
+        ],
+      },
+      ...(uri
+        ? {
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#4A3B32',
+                  action: { type: 'uri', label: '加入', uri },
+                },
+              ],
+            },
+          }
+        : {}),
+    },
+  };
+}
+async function shareInvite(r) {
+  try {
+    if (!window.liff?.isApiAvailable?.('shareTargetPicker')) throw Error('no_picker');
+    const sent = await liff.shareTargetPicker([inviteCard(r)]);
+    if (sent) toast('已傳送邀請');
+  } catch {
+    // Picker not enabled for this LIFF: copy the text so it can be pasted to the family member.
+    await navigator.clipboard
+      ?.writeText(`請加我的健康秘書好友，傳「${r.text}」加入家人`)
+      .catch(() => {});
+    toast('已複製邀請文字，貼給家人即可');
+  }
+}
+
 function family() {
   if (S.role !== 'owner') return [h('p', { class: 'muted' }, '只有長輩本人可以調整設定。')];
   const code = h('div', { class: 'cmd' }, '按下方按鈕產生邀請碼');
@@ -428,7 +493,11 @@ function family() {
         '產生邀請碼（24 小時內有效）',
         async () => {
           const r = await run('h_invite');
-          if (r) code.textContent = `請家人加這個官方帳號好友，傳「${r.text}」`;
+          if (!r) return;
+          code.replaceChildren(
+            h('div', {}, `邀請碼 ${r.code}（24 小時內有效）`),
+            button('分享給家人', () => shareInvite(r), 'btn brand'),
+          );
         },
         'btn',
       ),
