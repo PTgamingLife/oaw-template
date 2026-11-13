@@ -2,8 +2,45 @@
 // carries a LIFF ID token that is verified with LINE before anything is returned.
 import { publicConfig, richMenu } from '../_shared/logic.ts';
 import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
-import { env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
+import { apricoKey, env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
+import { healthAction } from '../_shared/health-api.ts';
+import {
+  DEFAULT_SUBSCRIBE_URL,
+  EXAMPLES,
+  INTERFACE_TEMPLATES,
+  MONTHLY_FEE,
+  SECRETARY_TEMPLATES,
+  TUTORIAL,
+} from '../_shared/onboarding.ts';
+
+type Quota = { paid: boolean; percentLeft?: number; extraTwdLeft?: number; paidUntil?: string };
+
+/** Subscription quota from Aprico; anything other than a clear "paid" counts as unpaid. */
+async function quota(): Promise<Quota> {
+  const base = env('APRICO_URL'),
+    url = base && `${base}/status`,
+    key = await apricoKey();
+  if (!url || !key) return { paid: false };
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(5000),
+    });
+    const q = res.ok ? await res.json() : null;
+    if (q?.paid !== true) return { paid: false };
+    return {
+      paid: true,
+      percentLeft: Math.max(0, Math.min(100, Number(q.percentLeft) || 0)),
+      extraTwdLeft: Math.max(0, Number(q.extraTwdLeft) || 0),
+      paidUntil: typeof q.paidUntil === 'string' ? q.paidUntil : '',
+    };
+  } catch {
+    return { paid: false };
+  }
+}
 
 const MAX_IMAGE = 1_000_000;
 
@@ -62,6 +99,21 @@ Deno.serve(async (req) => {
       }
       return respond({ config: publicConfig(config), member: card, isOwner });
     }
+    if (typeof body.action === 'string' && body.action.startsWith('h_'))
+      return respond(await healthAction(body.action, body, user.sub));
+    if (body.action === 'settings') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      const view = body.view === 'interface' ? 'interface' : 'secretary';
+      return respond({
+        view,
+        ...(await quota()),
+        fee: MONTHLY_FEE,
+        subscribeUrl: env('APRICO_SUBSCRIBE_URL') || DEFAULT_SUBSCRIBE_URL,
+        templates: view === 'interface' ? INTERFACE_TEMPLATES : SECRETARY_TEMPLATES,
+        examples: EXAMPLES,
+        tutorial: TUTORIAL,
+      });
+    }
     if (body.action === 'publish_menu') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       const png = decodePng(body.image);
@@ -78,6 +130,16 @@ Deno.serve(async (req) => {
   } catch (e) {
     const code = e instanceof Error && /^[a-z_0-9]{3,40}$/.test(e.message) ? e.message : 'failed';
     console.warn('oaw api failed:', code);
-    return respond({ error: code }, code.startsWith('image_') ? 400 : 500);
+    const status =
+      code.startsWith('image_') || code.endsWith('_invalid')
+        ? 400
+        : code === 'health_forbidden' || code === 'consent_required'
+          ? 403
+          : code === 'points_insufficient'
+            ? 402
+            : code === 'rate_limited'
+              ? 429
+              : 500;
+    return respond({ error: code }, status);
   }
 });

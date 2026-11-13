@@ -25,12 +25,13 @@ jobs:
       - name: Build the OA app
         run: node --experimental-strip-types scripts/oaw-setup.mjs
         env:
-          OAW_PX: ${{ vars.OAW_PX }}
-          OAW_SB_REF: ${{ vars.OAW_SB_REF }}
+          OAW_PX: ${{ vars.OAW_PX || secrets.OAW_PX }}
+          OAW_SB_REF: ${{ vars.OAW_SB_REF || secrets.OAW_SB_REF }}
           OAW_SB_ORG: ${{ vars.OAW_SB_ORG }}
           OAW_SB_REGION: ${{ vars.OAW_SB_REGION }}
-          OAW_APRICO_RUNTIME_URL: ${{ vars.OAW_APRICO_RUNTIME_URL }}
-          OAW_APRICO_DESIGN_URL: ${{ vars.OAW_APRICO_DESIGN_URL }}
+          OAW_APRICO_URL: ${{ vars.OAW_APRICO_URL }}
+          OAW_APRICO_SUBSCRIBE_URL: ${{ vars.OAW_APRICO_SUBSCRIBE_URL }}
+          OAW_TEMPLATE: ${{ vars.OAW_TEMPLATE }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           OAW_SB_DB_PASS: ${{ secrets.OAW_SB_DB_PASS }}
           OAW_LINE_MSG_ID: ${{ secrets.OAW_LINE_MSG_ID }}
@@ -46,6 +47,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add oaw/status.json liff/config.js
           git diff --cached --quiet || git commit -m "OAW setup status"
+          git pull --rebase origin main
           git push
       - uses: actions/upload-pages-artifact@v3
         with:

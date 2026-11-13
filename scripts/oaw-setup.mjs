@@ -9,8 +9,51 @@ import { validateConfig } from '../template/supabase/functions/_shared/logic.ts'
 
 const DRY = process.argv.includes('--dry-run');
 const E = (name) => (process.env[name] ?? '').trim();
+const HEALTH = E('OAW_TEMPLATE') === 'health';
 const SB = 'https://api.supabase.com';
 const LINE = 'https://api.line.me';
+// Aprico app API (status / design / digest / secretary replies), billed per owner.
+const APRICO_URL = 'https://hhcubvixldieuwdeqnwc.supabase.co/functions/v1/line-oa-kit-runtime-ai';
+// chat_message.write lets the settings page send the setup sentence for the owner.
+const LIFF_SCOPE = ['openid', 'profile', 'chat_message.write'];
+
+/** Owner-only rich menu (2500x843): left = AI secretary settings, right = interface settings. */
+export function ownerMenu(px, liffUrl, health = false) {
+  const half = { y: 0, width: 1250, height: 843 };
+  // Health template: the elder and the family share one 4-tab menu into the health pages.
+  if (health)
+    return {
+      size: { width: 2500, height: 843 },
+      selected: true,
+      name: `${px}-owner`,
+      chatBarText: '健康秘書',
+      areas: [
+        ['today', '今天'],
+        ['scan', '看健'],
+        ['calendar', '行事曆'],
+        ['family', '家人與設定'],
+      ].map(([tab, label], i) => ({
+        bounds: { x: i * 625, y: 0, width: 625, height: 843 },
+        action: { type: 'uri', label, uri: `${liffUrl}?view=health&tab=${tab}` },
+      })),
+    };
+  return {
+    size: { width: 2500, height: 843 },
+    selected: true,
+    name: `${px}-owner`,
+    chatBarText: '設定',
+    areas: [
+      {
+        bounds: { x: 0, ...half },
+        action: { type: 'uri', label: '設定我的 AI 秘書', uri: `${liffUrl}?view=secretary` },
+      },
+      {
+        bounds: { x: 1250, ...half },
+        action: { type: 'uri', label: '設定我的介面', uri: `${liffUrl}?view=interface` },
+      },
+    ],
+  };
+}
 const status = { ok: false, steps: {}, finished_at: null };
 const save = () => writeFileSync('oaw/status.json', JSON.stringify(status, null, 2) + '\n');
 const step = (name, value = 'done') => {
@@ -20,7 +63,8 @@ const step = (name, value = 'done') => {
 };
 
 export function inputs(env = process.env) {
-  const px = (env.OAW_PX ?? '').trim();
+  // Lowercase so a phone keyboard's automatic capital ("Test1") still works.
+  const px = (env.OAW_PX ?? '').trim().toLowerCase();
   if (!/^[a-z][a-z0-9]{1,7}$/.test(px)) throw Error('OAW_PX 必須是 2–8 個小寫英數字，字母開頭');
   const repo = (env.GITHUB_REPOSITORY ?? '').trim();
   const [owner, name] = repo.split('/');
@@ -37,13 +81,23 @@ export function render(px, out = 'build') {
   cpSync('template/supabase/functions/_shared', `${fn}/_shared`, { recursive: true });
   cpSync('template/supabase/functions/oaw-webhook', `${fn}/${px}-webhook`, { recursive: true });
   cpSync('template/supabase/functions/oaw-api', `${fn}/${px}-api`, { recursive: true });
+  cpSync('template/supabase/functions/oaw-digest', `${fn}/${px}-digest`, { recursive: true });
+  cpSync('template/supabase/functions/oaw-health', `${fn}/${px}-health`, { recursive: true });
   writeFileSync(`${fn}/_shared/px.ts`, `export const PX = '${px}';\n`);
   writeFileSync(`${out}/supabase/config.toml`, `project_id = "${px}-oa"\n`);
   return readFileSync('template/supabase/schema.sql', 'utf8').replaceAll('__px__', px);
 }
 
 /** SQL that seeds the config once and arms the one-time owner binding code. */
-export function seedSql(px, config, bindCode) {
+/** Accept full-width digits and stray spaces or dashes typed on a phone. */
+export function normalizeBindCode(raw = '') {
+  return String(raw)
+    .replace(/[０-９]/g, (d) => String(d.charCodeAt(0) - 0xff10))
+    .replace(/[\s-]/g, '');
+}
+
+export function seedSql(px, config, rawBindCode) {
+  const bindCode = normalizeBindCode(rawBindCode);
   const json = JSON.stringify(config);
   if (json.includes('$oaw$')) throw Error('config contains a reserved sequence');
   let sql = `insert into public.${px}_config (id, data) values (1, $oaw$${json}$oaw$::jsonb) on conflict (id) do nothing;\n`;
@@ -70,7 +124,20 @@ async function api(base, path, { token, method = 'GET', body, form } = {}) {
     signal: AbortSignal.timeout(60_000),
   });
   const text = await res.text();
-  if (!res.ok) throw Error(`${new URL(base).host}${path.split('?')[0]} → HTTP ${res.status}`);
+  if (!res.ok) {
+    // Error bodies from these APIs carry a reason (never our secrets); keep a short, single-line part.
+    let reason = '';
+    try {
+      const j = JSON.parse(text);
+      reason = j.message ?? j.error_description ?? j.error ?? '';
+    } catch {
+      reason = text;
+    }
+    reason = String(reason).replace(/\s+/g, ' ').slice(0, 200);
+    throw Error(
+      `${new URL(base).host}${path.split('?')[0]} → HTTP ${res.status}${reason ? `：${reason}` : ''}`,
+    );
+  }
   return text ? JSON.parse(text) : {};
 }
 
@@ -91,7 +158,13 @@ async function lineToken(id, secret) {
 async function supabaseProject(token, px, previous) {
   const known = E('OAW_SB_REF') || previous;
   if (known) return known;
-  const orgs = await api(SB, '/v1/organizations', { token });
+  const orgs = await api(SB, '/v1/organizations', { token }).catch((e) => {
+    if (/HTTP 40[13]/.test(e.message))
+      throw Error(
+        'Supabase Token 沒有建立專案的權限：請改用帳號層級的 Access Token，或在 Variables 設定 OAW_SB_REF 使用既有專案',
+      );
+    throw e;
+  });
   const org = E('OAW_SB_ORG') || orgs[0]?.id;
   if (!org) throw Error('找不到 Supabase 組織');
   const created = await api(SB, '/v1/projects', {
@@ -103,6 +176,12 @@ async function supabaseProject(token, px, previous) {
       region: E('OAW_SB_REGION') || 'ap-northeast-1',
       db_pass: E('OAW_SB_DB_PASS') || randomBytes(24).toString('base64url'),
     },
+  }).catch((e) => {
+    if (/free projects|maximum limits/i.test(e.message))
+      throw Error(
+        'Supabase 免費方案最多 2 個專案，已經滿了：請在 Variables 設定 OAW_SB_REF 使用既有專案，或到 Supabase 暫停一個不用的專案',
+      );
+    throw e;
   });
   return created.id ?? created.ref;
 }
@@ -165,7 +244,11 @@ async function main() {
   step('database');
 
   const liffDesc = `${px}-main`;
-  const { apps = [] } = await api(LINE, '/liff/v1/apps', { token: loginToken });
+  // LINE answers 404 (not an empty list) when the channel has no LIFF app yet.
+  const { apps = [] } = await api(LINE, '/liff/v1/apps', { token: loginToken }).catch((e) => {
+    if (/HTTP 404/.test(e.message)) return {};
+    throw e;
+  });
   const view = { type: 'full', url: pagesUrl };
   const existing = apps.find((a) => a.description === liffDesc);
   let liffId = existing?.liffId;
@@ -173,14 +256,14 @@ async function main() {
     await api(LINE, `/liff/v1/apps/${liffId}`, {
       token: loginToken,
       method: 'PUT',
-      body: { view },
+      body: { view, scope: LIFF_SCOPE },
     });
   else
     liffId = (
       await api(LINE, '/liff/v1/apps', {
         token: loginToken,
         method: 'POST',
-        body: { view, description: liffDesc, scope: ['openid', 'profile'], botPrompt: 'normal' },
+        body: { view, description: liffDesc, scope: LIFF_SCOPE, botPrompt: 'normal' },
       })
     ).liffId;
   const liffUrl = `https://liff.line.me/${liffId}`;
@@ -194,9 +277,11 @@ async function main() {
     LINE_LOGIN_ID: login.id,
     LIFF_URL: liffUrl,
     PAGES_ORIGIN: pagesOrigin,
+    PAGES_URL: pagesUrl,
     APRICO_KEY: E('OAW_APRICO_KEY'),
-    APRICO_RUNTIME_URL: E('OAW_APRICO_RUNTIME_URL'),
-    APRICO_DESIGN_URL: E('OAW_APRICO_DESIGN_URL'),
+    APRICO_URL: E('OAW_APRICO_URL') || APRICO_URL,
+    APRICO_SUBSCRIBE_URL: E('OAW_APRICO_SUBSCRIBE_URL'),
+    TEMPLATE: HEALTH ? 'health' : '',
   };
   await api(SB, `/v1/projects/${ref}/secrets`, {
     token: sbToken,
@@ -207,7 +292,7 @@ async function main() {
   });
   step('supabase_secrets');
 
-  for (const fn of [`${px}-webhook`, `${px}-api`])
+  for (const fn of [`${px}-webhook`, `${px}-api`, `${px}-digest`, `${px}-health`])
     execFileSync(
       'supabase',
       [
@@ -218,6 +303,7 @@ async function main() {
         ref,
         '--no-verify-jwt',
         '--use-api',
+        '--yes',
         '--workdir',
         'build',
       ],
@@ -245,9 +331,41 @@ async function main() {
     reason: test.reason ?? null,
   });
 
+  // Owner-only menu: replace any previous one, then relink it if an owner is already bound.
+  const { richmenus = [] } = await api(LINE, '/v2/bot/richmenu/list', { token: botToken });
+  const { richMenuId } = await api(LINE, '/v2/bot/richmenu', {
+    token: botToken,
+    method: 'POST',
+    body: ownerMenu(px, liffUrl, HEALTH),
+  });
+  const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
+    body: readFileSync(HEALTH ? 'oaw/health-menu.png' : 'oaw/owner-menu.png'),
+  });
+  if (!up.ok) throw Error(`上傳擁有者選單圖片失敗（HTTP ${up.status}）`);
+  const rows = await api(SB, `/v1/projects/${ref}/database/query`, {
+    token: sbToken,
+    method: 'POST',
+    body: { query: `select line_user_id from public.${px}_owner where id = 1` },
+  });
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (/^U[0-9a-f]{32}$/.test(row?.line_user_id ?? ''))
+    await api(LINE, `/v2/bot/user/${row.line_user_id}/richmenu/${richMenuId}`, {
+      token: botToken,
+      method: 'POST',
+    });
+  // Family members use the same health menu, so it is also every friend's default.
+  if (HEALTH)
+    await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, { token: botToken, method: 'POST' });
+  for (const m of richmenus)
+    if (m.name === `${px}-owner`)
+      await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
+  step('owner_menu', row?.line_user_id ? 'linked' : 'ready');
+
   writeFileSync(
     'liff/config.js',
-    `window.OAW = ${JSON.stringify({ px, liffId, api: `${fnBase}/${px}-api` })};\n`,
+    `window.OAW = ${JSON.stringify({ px, liffId, api: `${fnBase}/${px}-api`, basicId: status.basic_id })};\n`,
   );
   step('liff_config');
   status.ok = true;

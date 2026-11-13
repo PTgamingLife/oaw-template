@@ -14,6 +14,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    # Skip until the app has been set up (avoids a failed run right after the repo is created).
+    if: vars.OAW_PX != ''
     runs-on: ubuntu-latest
     environment:
       name: github-pages

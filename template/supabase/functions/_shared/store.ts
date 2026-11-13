@@ -35,6 +35,28 @@ export async function ownerId(): Promise<string> {
   return data?.line_user_id ?? '';
 }
 
+/** Aprico key: saved by the one-tap connect, or the setup secret for older installs. */
+export async function apricoKey(): Promise<string> {
+  const { data } = await db.from(T('owner')).select('aprico_key').eq('id', 1).maybeSingle();
+  return data?.aprico_key || env('APRICO_KEY');
+}
+
+/**
+ * Save the key from a one-tap connect. The sender becomes the owner when none is bound yet;
+ * an already bound owner can only be refreshed by that same owner. Returns true on success.
+ */
+export async function connectOwner(userId: string, key: string) {
+  if (!/^U[0-9a-f]{32}$/.test(userId)) return false;
+  await db.from(T('owner')).upsert({ id: 1 }, { onConflict: 'id', ignoreDuplicates: true });
+  const { data } = await db
+    .from(T('owner'))
+    .update({ line_user_id: userId, aprico_key: key, bind_hash: null, bind_expires: null })
+    .eq('id', 1)
+    .or(`line_user_id.is.null,line_user_id.eq.${userId}`)
+    .select('id');
+  return Boolean(data?.length);
+}
+
 /** Bind the owner with the one-time code from the build page. Returns true on success. */
 export async function bindOwner(userId: string, code: string) {
   const { data } = await db
@@ -79,6 +101,16 @@ export async function setPending(userId: string, proposal: unknown) {
     .upsert({ line_user_id: userId, proposal, created_at: new Date().toISOString() });
 }
 
+export async function peekPending(userId: string) {
+  const { data } = await db
+    .from(T('pending'))
+    .select('proposal,created_at')
+    .eq('line_user_id', userId)
+    .maybeSingle();
+  if (!data || Date.now() - new Date(data.created_at).getTime() > 30 * 60 * 1000) return null;
+  return data.proposal;
+}
+
 export async function takePending(userId: string) {
   const { data } = await db
     .from(T('pending'))
@@ -89,4 +121,74 @@ export async function takePending(userId: string) {
   // Proposals expire after 30 minutes.
   if (!row || Date.now() - new Date(row.created_at).getTime() > 30 * 60 * 1000) return null;
   return row.proposal;
+}
+
+/** True only the first time `key` is seen on a Taipei calendar day (stored in the pending table). */
+export async function onceToday(key: string) {
+  const id = `notice:${key}`,
+    day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const { data } = await db
+    .from(T('pending'))
+    .select('proposal')
+    .eq('line_user_id', id)
+    .maybeSingle();
+  if (data?.proposal?.day === day) return false;
+  await db
+    .from(T('pending'))
+    .upsert({ line_user_id: id, proposal: { day }, created_at: new Date().toISOString() });
+  return true;
+}
+
+// ---- Chat auto-record ----
+export async function bindGroup(groupId: string) {
+  await db.from(T('groups')).upsert({ group_id: groupId });
+}
+
+export async function groupBound(groupId: string) {
+  const { data } = await db
+    .from(T('groups'))
+    .select('group_id')
+    .eq('group_id', groupId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+export async function saveMessage(sourceId: string, isOwner: boolean, text: string) {
+  await db
+    .from(T('messages'))
+    .insert({ source_id: sourceId, is_owner: isOwner, text: text.slice(0, 500) });
+}
+
+/** Unprocessed lines, oldest first, capped so one digest stays within the AI input limit. */
+export async function pendingMessages(maxBytes = 9000) {
+  const { data } = await db
+    .from(T('messages'))
+    .select('id,is_owner,text,sent_at')
+    .is('processed_at', null)
+    .order('sent_at', { ascending: true })
+    .limit(300);
+  const out = [];
+  let bytes = 0;
+  for (const m of data ?? []) {
+    bytes += new TextEncoder().encode(m.text).length + 40;
+    if (bytes > maxBytes) break;
+    out.push(m);
+  }
+  return out;
+}
+
+export async function markProcessed(ids: number[]) {
+  if (ids.length)
+    await db.from(T('messages')).update({ processed_at: new Date().toISOString() }).in('id', ids);
+}
+
+export async function saveRecords(rows: Record<string, unknown>[]) {
+  if (rows.length) await db.from(T('records')).insert(rows);
+}
+
+export async function purgeOldMessages(days = 30) {
+  await db
+    .from(T('messages'))
+    .delete()
+    .lt('sent_at', new Date(Date.now() - days * 86400000).toISOString());
 }

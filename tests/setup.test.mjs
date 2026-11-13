@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { inputs, render, seedSql } from '../scripts/oaw-setup.mjs';
+import { inputs, normalizeBindCode, render, seedSql } from '../scripts/oaw-setup.mjs';
 
 test('inputs validate the prefix and derive the Pages URL', () => {
   const env = { OAW_PX: 'cafe', GITHUB_REPOSITORY: 'Someone/cafe-oa' };
@@ -11,7 +11,8 @@ test('inputs validate the prefix and derive the Pages URL', () => {
     pagesOrigin: 'https://someone.github.io',
     pagesUrl: 'https://someone.github.io/cafe-oa/',
   });
-  for (const px of ['', 'a', '1abc', 'Cafe', 'toolongname', 'ca-fe'])
+  assert.equal(inputs({ ...env, OAW_PX: ' Cafe ' }).px, 'cafe');
+  for (const px of ['', 'a', '1abc', 'toolongname', 'ca-fe'])
     assert.throws(() => inputs({ ...env, OAW_PX: px }));
 });
 
@@ -24,6 +25,10 @@ test('render applies the prefix to SQL, function folders and px.ts', () => {
     assert.match(sql, /enable row level security/);
     assert.ok(existsSync(`${out}/supabase/functions/cafe-webhook/index.ts`));
     assert.ok(existsSync(`${out}/supabase/functions/cafe-api/index.ts`));
+    assert.ok(existsSync(`${out}/supabase/functions/cafe-digest/index.ts`));
+    assert.ok(existsSync(`${out}/supabase/functions/cafe-health/index.ts`));
+    assert.match(sql, /cafe_h_caregivers/);
+    assert.match(sql, /cafe_messages/);
     assert.equal(
       readFileSync(`${out}/supabase/functions/_shared/px.ts`, 'utf8'),
       "export const PX = 'cafe';\n",
@@ -40,4 +45,35 @@ test('seed SQL stores only a hash of the bind code and never overwrites a bound 
   assert.match(sql, /where public\.cafe_owner\.line_user_id is null/);
   assert.throws(() => seedSql('cafe', { oaName: 'x' }, '12345'));
   assert.throws(() => seedSql('cafe', { oaName: '$oaw$' }, ''));
+});
+
+test('bind code accepts full-width digits, spaces and dashes', () => {
+  assert.equal(normalizeBindCode('１２３ ４５６'), '123456');
+  assert.equal(normalizeBindCode('123-456'), '123456');
+  assert.match(seedSql('cafe', { oaName: 'x' }, '１２３４５６'), /cafe_owner/);
+});
+
+test('owner menu splits 2500x843 into two settings links', async () => {
+  const { ownerMenu } = await import('../scripts/oaw-setup.mjs');
+  const m = ownerMenu('cafe', 'https://liff.line.me/1-a');
+  assert.equal(m.name, 'cafe-owner');
+  assert.deepEqual(
+    m.areas.map((a) => a.action.uri),
+    ['https://liff.line.me/1-a?view=secretary', 'https://liff.line.me/1-a?view=interface'],
+  );
+  assert.equal(m.areas[0].bounds.width + m.areas[1].bounds.width, 2500);
+});
+
+test('health template gets one 4-tab menu into the health pages', async () => {
+  const { ownerMenu } = await import('../scripts/oaw-setup.mjs');
+  const m = ownerMenu('cafe', 'https://liff.line.me/1-a', true);
+  assert.equal(m.name, 'cafe-owner');
+  assert.deepEqual(
+    m.areas.map((a) => a.action.uri.split('tab=')[1]),
+    ['today', 'scan', 'calendar', 'family'],
+  );
+  assert.equal(
+    m.areas.reduce((w, a) => w + a.bounds.width, 0),
+    2500,
+  );
 });

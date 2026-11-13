@@ -1,0 +1,23 @@
+name: OAW health reminders
+# Health template only (repository variable OAW_TEMPLATE = health). About every 15 minutes:
+# medicine and measurement reminders, missed-reminder notices to family, tomorrow's events
+# at night, and the weekly report on Sunday evening. GitHub may start runs a few minutes late.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health:
+    if: vars.OAW_TEMPLATE == 'health'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --experimental-strip-types scripts/oaw-health.mjs
+        env:
+          OAW_LINE_MSG_SECRET: ${{ secrets.OAW_LINE_MSG_SECRET }}

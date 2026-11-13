@@ -64,6 +64,18 @@ export function lineClient(token: string, fetcher = fetch) {
           await call(`/v2/bot/richmenu/${m.richMenuId}`, undefined, 'DELETE');
       return richMenuId as string;
     },
+    /** Link the owner-only menu (created at setup, named `{px}-owner`) to one user. */
+    async linkMenuByName(userId: string, name: string) {
+      const { richmenus = [] } = await call('/v2/bot/richmenu/list', undefined, 'GET');
+      const menu = richmenus.find((m: { name: string }) => m.name === name);
+      if (!menu) return false;
+      await call(
+        `/v2/bot/user/${encodeURIComponent(userId)}/richmenu/${menu.richMenuId}`,
+        undefined,
+        'POST',
+      );
+      return true;
+    },
   };
 }
 
