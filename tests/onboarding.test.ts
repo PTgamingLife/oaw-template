@@ -65,7 +65,7 @@ test('quota card offers a top-up and falls back to the default subscribe page', 
   assert.match(card.altText, /NT\$30–50/);
   assert.equal(
     card.contents.footer.contents[0].action.uri,
-    'https://liff.line.me/2012197506-Vmb4O5iT/build.html',
+    'https://liff.line.me/2012197506-Vmb4O5iT/build.html?renew=1',
   );
   assert.equal(
     quotaCard('https://x.example/topup').contents.footer.contents[0].action.uri,
