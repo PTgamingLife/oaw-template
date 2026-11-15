@@ -458,3 +458,27 @@ body.brand {
 .health details .btn + .btn {
   margin-top: 10px;
 }
+.shapes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.shapes .shape {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.shapes .shape.on {
+  border-color: #2b2b2b;
+}
+.shapes canvas {
+  margin: 0;
+  width: 100%;
+  height: auto;
+}

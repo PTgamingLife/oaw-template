@@ -2,7 +2,15 @@
 // carries a LIFF ID token that is verified with LINE before anything is returned.
 import { publicConfig, richMenu } from '../_shared/logic.ts';
 import { lineClient, statelessToken, verifyIdToken } from '../_shared/line.ts';
-import { apricoKey, env, loadConfig, member, ownerId, upsertMember } from '../_shared/store.ts';
+import {
+  apricoKey,
+  env,
+  loadConfig,
+  member,
+  ownerId,
+  saveConfig,
+  upsertMember,
+} from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
 import {
@@ -117,6 +125,9 @@ Deno.serve(async (req) => {
     if (body.action === 'publish_menu') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       const png = decodePng(body.image);
+      // The shape chosen on the publish page is remembered for later edits.
+      if (body.shape !== undefined && body.shape !== config.shape)
+        Object.assign(config, await saveConfig({ ...config, shape: body.shape }));
       const liffUrl = env('LIFF_URL');
       const token = await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'));
       const id = await lineClient(token).publishMenu(
@@ -131,7 +142,7 @@ Deno.serve(async (req) => {
     const code = e instanceof Error && /^[a-z_0-9]{3,40}$/.test(e.message) ? e.message : 'failed';
     console.warn('oaw api failed:', code);
     const status =
-      code.startsWith('image_') || code.endsWith('_invalid')
+      code.startsWith('image_') || code.startsWith('invalid_') || code.endsWith('_invalid')
         ? 400
         : code === 'health_forbidden' || code === 'consent_required'
           ? 403

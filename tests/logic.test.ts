@@ -20,10 +20,19 @@ test('default config is valid', () => {
   assert.equal(config.cells.length, 8);
 });
 
+test('menu shape defaults to square and is kept', () => {
+  const { shape: _, ...old } = config;
+  assert.equal(validateConfig(old).shape, 0);
+  assert.equal(validateConfig({ ...config, shape: 2 }).shape, 2);
+  assert.equal(publicConfig(validateConfig({ ...config, shape: 5 })).shape, 5);
+});
+
 test('config validation rejects bad input', () => {
   const bad = (patch: object) => assert.throws(() => validateConfig({ ...config, ...patch }));
   bad({ grid: 5 });
   bad({ theme: 99 });
+  bad({ shape: 6 });
+  bad({ shape: 1.5 });
   bad({ cells: config.cells.slice(0, 4) });
   bad({ welcome: 'x'.repeat(501) });
   const cells = structuredClone(config.cells);
@@ -98,7 +107,14 @@ test('rich menu maps actions; LIFF url only for full cells', () => {
 
 test('public config exposes only menu data', () => {
   const pub = publicConfig(config);
-  assert.deepEqual(Object.keys(pub).sort(), ['cells', 'colors', 'grid', 'oaName', 'theme']);
+  assert.deepEqual(Object.keys(pub).sort(), [
+    'cells',
+    'colors',
+    'grid',
+    'oaName',
+    'shape',
+    'theme',
+  ]);
   assert.equal(pub.cells.length, 4);
 });
 
