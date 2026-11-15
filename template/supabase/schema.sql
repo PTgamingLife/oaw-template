@@ -85,6 +85,8 @@ create table if not exists public.__px___h_profile (
   invite_hash text,
   invite_expires timestamptz
 );
+-- What the elder receives (reminders / events / weekly); missing keys mean on.
+alter table public.__px___h_profile add column if not exists notify jsonb not null default '{}'::jsonb;
 
 create table if not exists public.__px___h_measures (
   id bigint generated always as identity primary key,

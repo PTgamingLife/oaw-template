@@ -7,6 +7,7 @@ import {
   flagReason,
   measure,
   notifySettings,
+  ownerNotify,
   reminders,
   taipei,
   thresholds,
@@ -127,6 +128,7 @@ async function state(role: Role) {
     Object.assign(out, {
       thresholds: thresholds(p.thresholds),
       reminders: list,
+      notify: ownerNotify(p.notify),
       caregivers: (cg ?? []).map((c: any) => ({
         id: c.line_user_id,
         name: c.display_name || '家人',
@@ -221,6 +223,7 @@ export async function healthAction(action: string, body: any, userId: string) {
         id: 1,
         thresholds: thresholds(body.thresholds),
         reminders: reminders(body.reminders),
+        ...(body.notify ? { notify: ownerNotify(body.notify) } : {}),
       });
       return state(role);
     case 'h_invite': {

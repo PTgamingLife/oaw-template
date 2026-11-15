@@ -62,6 +62,7 @@ export async function mockCall(action, extra = {}) {
   if (location.search.includes('forbidden=1')) throw Error('health_forbidden');
   if (action === 'h_consent') S.consent = true;
   if (action === 'h_done') S.today[extra.slot].done = true;
+  if (action === 'h_settings' && extra.notify) S.notify = { ...extra.notify };
   if (action === 'h_measure') return { saved: '已記錄', flagged: '' };
   if (action === 'h_invite') return { code: '482913', text: '家人 482913' };
   if (action === 'h_scan') return { report: REPORT };
