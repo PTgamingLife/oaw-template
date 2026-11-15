@@ -17,6 +17,7 @@ import {
 } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import { healthChat } from '../_shared/health-chat.ts';
+import { applyHealth, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import {
   apricoKey,
   bindGroup,
@@ -35,8 +36,8 @@ import {
   upsertMember,
 } from '../_shared/store.ts';
 
-/** Aprico app API: '' = secretary reply, 'design' = config edit proposal. */
-async function aprico(route: '' | 'design', body: unknown) {
+/** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
+async function aprico(route: '' | 'design' | 'settings', body: unknown) {
   const base = env('APRICO_URL'),
     key = await apricoKey(),
     url = base && (route ? `${base}/${route}` : base);
@@ -168,12 +169,13 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       await reply(noticeCard('已取消', '這次修改不會套用。'));
       return;
     case 'apply': {
-      const proposal = (await takePending(userId)) as { config?: unknown } | null;
-      if (!proposal?.config) {
+      const proposal = (await takePending(userId)) as { config?: unknown; health?: any } | null;
+      if (!proposal?.config && !proposal?.health) {
         await reply(noticeCard('沒有待套用的修改', '想調整時，傳「修改：你的需求」給我。'));
         return;
       }
-      await saveConfig(validateConfig(proposal.config));
+      if (proposal.config) await saveConfig(validateConfig(proposal.config));
+      if (proposal.health) await applyHealth(proposal.health);
       const liff = env('LIFF_URL');
       await reply(
         noticeCard(
@@ -213,6 +215,26 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     case 'fallback':
       // The owner's own free text is a note for the nightly digest.
       if (owner === userId) {
+        // Plain words can also be a settings request (「週報不要發給我」); ask Aprico first.
+        const snap = await healthSnapshot();
+        const { status, data } = await aprico('settings', {
+          requestId: event.webhookEventId,
+          request: event.message.text.slice(0, 1500),
+          config,
+          health: snap?.model ?? null,
+        });
+        const s = status === 200 ? settingsReply(data, snap?.ids ?? null) : null;
+        if (s?.kind === 'ask') {
+          await reply(noticeCard('想確認一下', s.summary));
+          return;
+        }
+        if (s?.kind === 'change') {
+          await setPending(userId, { config: s.config, health: s.health });
+          await reply(
+            noticeCard('⚙️ 設定修改提案', `${s.summary}\n\n回覆「套用」確認，或回覆「取消」。`),
+          );
+          return;
+        }
         await saveMessage(userId, true, event.message.text);
         await reply(noticeCard('📝 已記下', RECORDED));
         return;

@@ -171,3 +171,10 @@ export const notifySettings = (raw: any) => ({
   missed: raw?.missed !== false,
   weekly: raw?.weekly !== false,
 });
+
+/** What the elder (owner) receives; anything not switched off stays on. */
+export const ownerNotify = (raw: any) => ({
+  reminders: raw?.reminders !== false,
+  events: raw?.events !== false,
+  weekly: raw?.weekly !== false,
+});

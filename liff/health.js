@@ -502,6 +502,36 @@ function family() {
         'btn',
       ),
     ),
+    h(
+      'section',
+      { class: 'card' },
+      h('h2', {}, '我收到的通知'),
+      h(
+        'div',
+        { class: 'chips' },
+        ...[
+          ['reminders', '提醒'],
+          ['events', '明天行程'],
+          ['weekly', '週報'],
+        ].map(([k, label]) =>
+          h(
+            'label',
+            { class: 'chip-check' },
+            h('input', {
+              type: 'checkbox',
+              ...(S.notify?.[k] !== false ? { checked: '' } : {}),
+              onchange: (e) =>
+                run('h_settings', {
+                  thresholds: S.thresholds,
+                  reminders: S.reminders,
+                  notify: { ...S.notify, [k]: e.target.checked },
+                }).then(render),
+            }),
+            label,
+          ),
+        ),
+      ),
+    ),
     h('details', { class: 'card' }, h('summary', {}, '提醒時間'), rem, addRem, save()),
     h('details', { class: 'card' }, h('summary', {}, '異常範圍'), ranges, save()),
   ];

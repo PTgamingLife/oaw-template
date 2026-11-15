@@ -10,6 +10,7 @@ import {
   reminders,
   taipei,
   weeklyDue,
+  ownerNotify,
 } from '../_shared/health.ts';
 import { notifyCaregivers } from '../_shared/health-api.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
@@ -63,8 +64,10 @@ Deno.serve(async (req) => {
   const { day, time } = taipei();
   const list = reminders(profile.reminders);
   const sent: string[] = [];
+  // What the elder switched off (in settings or by asking in chat).
+  const mine = ownerNotify(profile.notify);
 
-  for (const r of dueSlots(list, time))
+  for (const r of mine.reminders ? dueSlots(list, time) : [])
     if (await onceToday(`rem:${r.slot}`)) {
       await line.push(owner, [
         noticeCard(r.kind === 'med' ? '💊 吃藥時間' : '🩺 量測時間', `${r.time}　${r.label}`, {
@@ -78,7 +81,8 @@ Deno.serve(async (req) => {
 
   const { data: doneRows } = await db.from(T('h_done')).select('slot').eq('day', day);
   const done = (doneRows ?? []).map((d: any) => d.slot);
-  for (const r of missedSlots(list, time, done))
+  // No reminder was sent when they are off, so nothing can be missed either.
+  for (const r of mine.reminders ? missedSlots(list, time, done) : [])
     if (await onceToday(`missed:${r.slot}`)) {
       await notifyCaregivers('missed', [
         noticeCard('提醒還沒完成', `「${r.label}」（${r.time}）到現在還沒有回覆，可以關心一下。`),
@@ -96,7 +100,7 @@ Deno.serve(async (req) => {
     if (events?.length) {
       const text = events.map((e: any) => `${e.time || '全天'}　${e.title}`).join('\n');
       const card = noticeCard('📅 明天的行程', text);
-      await line.push(owner, [card]);
+      if (mine.events) await line.push(owner, [card]);
       await notifyCaregivers('alert', [card]);
       sent.push('events');
     }
@@ -104,7 +108,7 @@ Deno.serve(async (req) => {
 
   if (weeklyDue() && (await onceToday('weekly'))) {
     const card = noticeCard('📋 本週健康週報', await weeklyText(list.length));
-    await line.push(owner, [card]);
+    if (mine.weekly) await line.push(owner, [card]);
     await notifyCaregivers('weekly', [card]);
     sent.push('weekly');
   }
