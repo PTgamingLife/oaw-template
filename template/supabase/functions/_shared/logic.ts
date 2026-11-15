@@ -12,6 +12,9 @@ export const THEMES = [
   ['#C3C6C5', '#DCDDD9', '#B7BDBA', '#E7E5DE'],
 ];
 
+/** Rich menu cell shapes, drawn by liff/menu-shapes.js. */
+export const SHAPES = ['方塊', '圓角', '拼圖', '拱門', '票券', '花邊'];
+
 export type Cell = {
   label: string;
   action: 'message' | 'full' | 'web';
@@ -22,6 +25,8 @@ export type Config = {
   oaName: string;
   grid: 4 | 6 | 8;
   theme: number;
+  /** Menu cell shape, index into SHAPES (configs from before shapes default to 0). */
+  shape: number;
   cells: Cell[];
   welcome: string;
   failure: string;
@@ -39,6 +44,8 @@ export function validateConfig(value: unknown): Config {
   if (![4, 6, 8].includes(v.grid)) throw Error('invalid_grid');
   if (!Number.isInteger(v.theme) || v.theme < 0 || v.theme >= THEMES.length)
     throw Error('invalid_theme');
+  const shape = v.shape ?? 0;
+  if (!Number.isInteger(shape) || shape < 0 || shape >= SHAPES.length) throw Error('invalid_shape');
   if (!Array.isArray(v.cells) || v.cells.length !== 8) throw Error('invalid_cells');
   const cells = v.cells.map((c) => {
     if (!c || !['message', 'full', 'web'].includes(c.action)) throw Error('invalid_cell');
@@ -58,6 +65,7 @@ export function validateConfig(value: unknown): Config {
     oaName: str(v.oaName, 40, 'oa_name'),
     grid: v.grid,
     theme: v.theme,
+    shape,
     cells,
     welcome: str(v.welcome, 500, 'welcome'),
     failure: str(v.failure, 300, 'failure'),
@@ -194,6 +202,7 @@ export function publicConfig(config: Config) {
     grid: config.grid,
     theme: config.theme,
     colors: THEMES[config.theme],
+    shape: config.shape,
     cells: config.cells.slice(0, config.grid),
   };
 }

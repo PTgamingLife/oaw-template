@@ -1,4 +1,6 @@
 // LIFF page for one OA app: member card, menu pages, and the owner's menu publisher.
+import { SHAPES, paintCells } from './menu-shapes.js';
+
 const app = document.getElementById('app');
 const cfg = window.OAW;
 
@@ -72,17 +74,17 @@ export function menuAreas(grid, width = 1200, height = 810) {
   });
 }
 
-function drawMenu(canvas, config) {
+function drawMenu(canvas, config, shape = config.shape ?? 0) {
   canvas.width = 1200;
   canvas.height = 810;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fffef9';
   ctx.fillRect(0, 0, 1200, 810);
+  const areas = menuAreas(config.grid);
+  paintCells(ctx, areas, config.grid, shape, (a) => config.colors[a.index % 4], 1200, 810);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const a of menuAreas(config.grid)) {
-    ctx.fillStyle = config.colors[a.index % 4];
-    ctx.fillRect(a.x + 4, a.y + 4, a.w - 8, a.h - 8);
+  for (const a of areas) {
     ctx.fillStyle = '#2b2b2b';
     ctx.font = 'bold 44px "PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
     ctx.fillText(
@@ -96,11 +98,28 @@ function drawMenu(canvas, config) {
 async function adminView(me) {
   if (!me.isOwner) return fail('只有這個帳號的管理者可以發布選單。');
   const canvas = h('canvas');
-  drawMenu(canvas, me.config);
+  let shape = me.config.shape ?? 0;
+  drawMenu(canvas, me.config, shape);
+  const picks = SHAPES.map((label, i) => {
+    const thumb = h('canvas');
+    drawMenu(thumb, me.config, i);
+    const pick = h(
+      'button',
+      { class: i === shape ? 'shape on' : 'shape', type: 'button' },
+      thumb,
+      h('span', {}, label),
+    );
+    pick.addEventListener('click', () => {
+      shape = i;
+      drawMenu(canvas, me.config, shape);
+      picks.forEach((p, j) => p.classList.toggle('on', j === i));
+    });
+    return pick;
+  });
   const status = h(
     'p',
     { class: 'muted' },
-    '確認下方預覽，按「發布選單」後，所有好友會看到新的圖文選單。',
+    '確認上方預覽，按「發布選單」後，所有好友會看到新的圖文選單。',
   );
   const button = h('button', { class: 'btn primary', type: 'button' }, '發布選單');
   button.addEventListener('click', async () => {
@@ -108,14 +127,21 @@ async function adminView(me) {
     status.textContent = '發布中…';
     try {
       const image = canvas.toDataURL('image/png').split(',')[1];
-      await call('publish_menu', { image });
+      await call('publish_menu', { image, shape });
       status.textContent = '已發布。回到聊天室就能看到新的選單。';
     } catch (e) {
       status.textContent = `發布失敗（${e.message}），請稍後再試。`;
       button.disabled = false;
     }
   });
-  show(h('h1', {}, '圖文選單'), canvas, status, button);
+  show(
+    h('h1', {}, '圖文選單'),
+    h('p', { class: 'muted' }, '選一種格子形狀：'),
+    h('div', { class: 'shapes' }, picks),
+    canvas,
+    status,
+    button,
+  );
 }
 
 const exampleFor = (data, tpl) =>
