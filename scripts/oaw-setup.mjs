@@ -62,6 +62,16 @@ const step = (name, value = 'done') => {
   console.log(`[oaw] ${name}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
 };
 
+/**
+ * Health template: the new health menu becomes every friend's default only when there is
+ * no default yet, or the default is our own previous health menu. A default menu the
+ * owner chose (published from the 發布選單 page or LINE's console) is never replaced.
+ */
+export function takeDefault(defaultId, richmenus, px) {
+  if (!defaultId) return true;
+  return richmenus.some((m) => m.richMenuId === defaultId && m.name === `${px}-owner`);
+}
+
 export function inputs(env = process.env) {
   // Lowercase so a phone keyboard's automatic capital ("Test1") still works.
   const px = (env.OAW_PX ?? '').trim().toLowerCase();
@@ -355,9 +365,19 @@ async function main() {
       token: botToken,
       method: 'POST',
     });
-  // Family members use the same health menu, so it is also every friend's default.
-  if (HEALTH)
-    await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, { token: botToken, method: 'POST' });
+  // Family members use the same health menu, so it is also every friend's default,
+  // unless the owner has set a default menu of their own (see takeDefault).
+  if (HEALTH) {
+    // 404 = no default yet. Any other failure: leave the owner's menu alone.
+    const current = await api(LINE, '/v2/bot/user/all/richmenu', { token: botToken }).catch((e) =>
+      /HTTP 404/.test(e.message) ? {} : { richMenuId: 'unknown' },
+    );
+    if (takeDefault(current.richMenuId, richmenus, px))
+      await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, {
+        token: botToken,
+        method: 'POST',
+      });
+  }
   for (const m of richmenus)
     if (m.name === `${px}-owner`)
       await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
