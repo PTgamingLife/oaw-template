@@ -77,3 +77,17 @@ test('health template gets one 4-tab menu into the health pages', async () => {
     2500,
   );
 });
+
+test('the health menu only takes over a missing default or our own old one', async () => {
+  const { takeDefault } = await import('../scripts/oaw-setup.mjs');
+  const menus = [
+    { richMenuId: 'r-old', name: 'cafe-owner' },
+    { richMenuId: 'r-mine', name: 'cafe-main' },
+    { richMenuId: 'r-console', name: 'Spring sale' },
+  ];
+  assert.equal(takeDefault(undefined, menus, 'cafe'), true);
+  assert.equal(takeDefault('r-old', menus, 'cafe'), true);
+  assert.equal(takeDefault('r-mine', menus, 'cafe'), false);
+  assert.equal(takeDefault('r-console', menus, 'cafe'), false);
+  assert.equal(takeDefault('r-unknown', menus, 'cafe'), false);
+});
