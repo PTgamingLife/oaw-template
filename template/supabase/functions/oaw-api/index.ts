@@ -8,11 +8,15 @@ import {
   loadConfig,
   member,
   ownerId,
+  peekPending,
   saveConfig,
+  takePending,
   upsertMember,
 } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
+import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
+import { applyProposal } from '../_shared/owner-settings.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
   EXAMPLES,
@@ -107,10 +111,31 @@ Deno.serve(async (req) => {
       }
       return respond({ config: publicConfig(config), member: card, isOwner });
     }
-    if (typeof body.action === 'string' && body.action.startsWith('h_'))
+    // Owner PIN and pending proposal (applied here after the PIN when one is set).
+    if (typeof body.action === 'string' && body.action.startsWith('pin_')) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, false);
+      if (body.action === 'pin_set') await setPin(user.sub, body.pin, body.oldPin);
+      if (body.action === 'pin_verify') await verifyPin(user.sub, body.pin);
+      return respond(await pinStatus(user.sub));
+    }
+    if (body.action === 'pending_peek' || body.action === 'pending_apply') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      const pending: any = await peekPending(user.sub);
+      const has = Boolean(pending?.config || pending?.health);
+      if (body.action === 'pending_peek')
+        return respond({ pending: has, summary: has ? String(pending.summary ?? '') : '' });
+      await guardOwner(user.sub, true);
+      return respond({ applied: await applyProposal((await takePending(user.sub)) as any) });
+    }
+    if (typeof body.action === 'string' && body.action.startsWith('h_')) {
+      // The elder's own health views and settings need a recent PIN; family members do not.
+      if (isOwner) await guardOwner(user.sub, true);
       return respond(await healthAction(body.action, body, user.sub));
+    }
     if (body.action === 'settings') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, false);
       const view = body.view === 'interface' ? 'interface' : 'secretary';
       return respond({
         view,
@@ -124,6 +149,7 @@ Deno.serve(async (req) => {
     }
     if (body.action === 'publish_menu') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, true);
       const png = decodePng(body.image);
       // The shape chosen on the publish page is remembered for later edits.
       if (body.shape !== undefined && body.shape !== config.shape)
@@ -144,13 +170,19 @@ Deno.serve(async (req) => {
     const status =
       code.startsWith('image_') || code.startsWith('invalid_') || code.endsWith('_invalid')
         ? 400
-        : code === 'health_forbidden' || code === 'consent_required'
+        : code === 'health_forbidden' || code === 'consent_required' || code === 'owner_only'
           ? 403
-          : code === 'points_insufficient'
-            ? 402
-            : code === 'rate_limited'
-              ? 429
-              : 500;
+          : code === 'owner_locked' || code === 'pin_wait'
+            ? 423
+            : code === 'pin_required' || code === 'pin_wrong' || code === 'pin_not_set'
+              ? 401
+              : code === 'lock_unknown'
+                ? 503
+                : code === 'points_insufficient'
+                  ? 402
+                  : code === 'rate_limited'
+                    ? 429
+                    : 500;
     return respond({ error: code }, status);
   }
 });

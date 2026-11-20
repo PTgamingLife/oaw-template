@@ -1,5 +1,6 @@
 // LIFF page for one OA app: member card, menu pages, and the owner's menu publisher.
 import { SHAPES, paintCells } from './menu-shapes.js';
+import { confirmView, securityMessage, securitySection, withPin } from './security.js';
 
 const app = document.getElementById('app');
 const cfg = window.OAW;
@@ -17,7 +18,7 @@ const h = (tag, attrs = {}, ...children) => {
 const show = (...nodes) => app.replaceChildren(...nodes.flat().filter((n) => n != null));
 const fail = (msg) => show(h('p', { class: 'error' }, msg));
 
-async function call(action, extra = {}) {
+async function rawCall(action, extra = {}) {
   const res = await fetch(cfg.api, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -27,6 +28,8 @@ async function call(action, extra = {}) {
   if (!res.ok) throw Error(data.error || 'failed');
   return data;
 }
+// Owner calls that need a recent PIN ask for it once and retry.
+const call = withPin(h, rawCall);
 
 function memberCard(me, profile) {
   const joined = me.member?.joined_at
@@ -255,6 +258,7 @@ async function settingsView(view) {
       ? quotaBars(data)
       : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`),
     ...cards,
+    data.view === 'secretary' ? await securitySection(h, call) : null,
   );
 }
 
@@ -267,6 +271,10 @@ async function main() {
   document.documentElement.style.setProperty('--accent', me.config.colors[0]);
   document.title = me.config.oaName || '會員中心';
   if (params.get('view') === 'admin') return adminView(me);
+  if (params.get('view') === 'confirm') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以套用設定。');
+    return confirmView(h, show, call);
+  }
   if (params.get('view') === 'health')
     return (await import('./health.js')).healthView({ h, show, call }, params);
   if (['secretary', 'interface'].includes(params.get('view'))) {
@@ -287,4 +295,13 @@ if (mock)
   Promise.all([import('./health.js'), import('./health-mock.js')]).then(([m, d]) =>
     m.healthView({ h, show, call: d.mockCall }, new URLSearchParams(location.search)),
   );
-else if (window.liff) main().catch((e) => fail(`載入失敗（${e.message}），請關閉後重新開啟。`));
+else if (window.liff)
+  main().catch((e) =>
+    fail(
+      ['owner_locked', 'lock_unknown'].includes(e.message)
+        ? securityMessage(e.message)
+        : e.message === 'pin_cancelled'
+          ? '需要 PIN 才能打開這一頁，請重新開啟後輸入。'
+          : `載入失敗（${e.message}），請關閉後重新開啟。`,
+    ),
+  );

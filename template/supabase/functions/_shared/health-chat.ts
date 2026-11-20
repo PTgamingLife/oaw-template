@@ -7,6 +7,7 @@ import { healthRole, saveMeasure } from './health-api.ts';
 import type { lineClient } from './line.ts';
 import { noticeCard } from './onboarding.ts';
 import { db, env, setPending, takePending, T } from './store.ts';
+import { guardOwner } from './guard.ts';
 
 export const healthEnabled = () => env('TEMPLATE') === 'health';
 type Line = ReturnType<typeof lineClient>;
@@ -68,6 +69,18 @@ export async function healthChat(event: any, userId: string, owner: string, line
     }
     const family = data.match(/^h-approve:(U[0-9a-f]{32})$/)?.[1];
     if (family) {
+      try {
+        await guardOwner(userId, true);
+      } catch (e) {
+        const liff = env('LIFF_URL');
+        return (e as Error).message === 'pin_required'
+          ? noticeCard(
+              '🔐 請輸入 PIN',
+              '同意家人加入前需要你的 PIN，請到「家人與設定」按同意。',
+              liff ? { label: '前往家人與設定', uri: `${liff}?view=health&tab=family` } : undefined,
+            )
+          : noticeCard('暫時無法同意', '目前無法確認帳號狀態，請稍後再試。');
+      }
       await db.from(T('h_caregivers')).update({ status: 'active' }).eq('line_user_id', family);
       await line
         .push(family, [noticeCard('✅ 已加入', '之後會收到長輩同意分享的提醒與週報。')])
