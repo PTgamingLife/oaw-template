@@ -191,4 +191,8 @@ export async function purgeOldMessages(days = 30) {
     .from(T('messages'))
     .delete()
     .lt('sent_at', new Date(Date.now() - days * 86400000).toISOString());
+  await db
+    .from(T('link_inbox'))
+    .delete()
+    .lt('created_at', new Date(Date.now() - days * 86400000).toISOString());
 }

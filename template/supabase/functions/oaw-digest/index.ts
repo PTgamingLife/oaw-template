@@ -4,6 +4,7 @@
 import { lineClient, statelessToken } from '../_shared/line.ts';
 import { digestCard, digestKey, digestRows } from '../_shared/digest.ts';
 import { noticeCard, quotaCard } from '../_shared/onboarding.ts';
+import { autoSend } from '../_shared/links.ts';
 import {
   apricoKey,
   env,
@@ -63,5 +64,7 @@ Deno.serve(async (req) => {
   await markProcessed(msgs.map((m) => m.id));
   const card = digestCard(digest, env('LIFF_URL'));
   if (card) await line.push(owner, [card]);
-  return json({ messages: msgs.length, records: digestRows(digest).length });
+  // Copies to linked accounts that opened them (each side's scope is checked by Aprico).
+  const linked = await autoSend(digest).catch(() => 0);
+  return json({ messages: msgs.length, records: digestRows(digest).length, linked });
 });
