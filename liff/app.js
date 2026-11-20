@@ -258,6 +258,19 @@ async function settingsView(view) {
       ? quotaBars(data)
       : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`),
     ...cards,
+    data.view === 'secretary'
+      ? h(
+          'section',
+          { class: 'card' },
+          h('h3', {}, '🔗 跨帳號連結'),
+          h(
+            'p',
+            { class: 'muted' },
+            '和其他官方帳號（例如其他部門）互傳指定資訊，雙方都同意才會連結。',
+          ),
+          h('a', { class: 'btn', href: '?view=links' }, '管理連結'),
+        )
+      : null,
     data.view === 'secretary' ? await securitySection(h, call) : null,
   );
 }
@@ -271,6 +284,10 @@ async function main() {
   document.documentElement.style.setProperty('--accent', me.config.colors[0]);
   document.title = me.config.oaName || '會員中心';
   if (params.get('view') === 'admin') return adminView(me);
+  if (params.get('view') === 'links') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以設定跨帳號連結。');
+    return (await import('./links.js')).linksView(h, show, call);
+  }
   if (params.get('view') === 'confirm') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以套用設定。');
     return confirmView(h, show, call);

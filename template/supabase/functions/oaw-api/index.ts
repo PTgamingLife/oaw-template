@@ -17,6 +17,7 @@ import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
 import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
+import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
   EXAMPLES,
@@ -94,6 +95,17 @@ Deno.serve(async (req) => {
   } catch {
     return respond({ error: 'bad_request' }, 400);
   }
+  // Aprico's relay pings here when a sealed message is waiting (no data in the ping).
+  if (body?.action === 'link_ping') {
+    const owner = await ownerId();
+    const push = async (messages: unknown[]) =>
+      lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'))).push(
+        owner,
+        messages,
+      );
+    const n = owner ? await pullInbox(push).catch(() => 0) : 0;
+    return respond({ ok: true, received: n });
+  }
   let user;
   try {
     user = await verifyIdToken(String(body?.idToken ?? ''), env('LINE_LOGIN_ID'));
@@ -118,6 +130,20 @@ Deno.serve(async (req) => {
       if (body.action === 'pin_set') await setPin(user.sub, body.pin, body.oldPin);
       if (body.action === 'pin_verify') await verifyPin(user.sub, body.pin);
       return respond(await pinStatus(user.sub));
+    }
+    if (typeof body.action === 'string' && body.action.startsWith('link_')) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      // Listing only needs an unlocked owner; anything that changes a link needs the PIN.
+      await guardOwner(user.sub, body.action !== 'link_list');
+      const label = typeof body.label === 'string' ? body.label.trim().slice(0, 20) : '';
+      if (body.action === 'link_list') return respond({ links: await listLinks() });
+      if (body.action === 'link_create') return respond(await createLink(label));
+      if (body.action === 'link_accept')
+        return respond(await acceptLink(String(body.code ?? ''), label, body.scope));
+      if (body.action === 'link_scope')
+        return respond(await aprLink('scope', { linkId: body.linkId, scope: body.scope }));
+      if (body.action === 'link_revoke')
+        return respond(await aprLink('revoke', { linkId: body.linkId }));
     }
     if (body.action === 'pending_peek' || body.action === 'pending_apply') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

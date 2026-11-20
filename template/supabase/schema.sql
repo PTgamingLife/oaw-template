@@ -22,6 +22,22 @@ alter table public.__px___owner add column if not exists pin_fails int not null 
 alter table public.__px___owner add column if not exists pin_wait_until timestamptz;
 alter table public.__px___owner add column if not exists pin_ok_until timestamptz;
 alter table public.__px___owner add column if not exists reset_nonce text;
+-- Cross-account links: this app's key pair (the private key never leaves this database).
+alter table public.__px___owner add column if not exists link_key jsonb;
+alter table public.__px___owner add column if not exists link_pulled_at timestamptz;
+
+-- Messages received from linked accounts, kept 30 days for 「加入今晚整理」.
+create table if not exists public.__px___link_inbox (
+  id uuid primary key,
+  from_label text not null,
+  kind text not null,
+  text text not null,
+  saved boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.__px___link_inbox enable row level security;
+revoke all on public.__px___link_inbox from public, anon, authenticated;
+grant select, insert, update, delete on public.__px___link_inbox to service_role;
 
 create table if not exists public.__px___members (
   line_user_id text primary key,

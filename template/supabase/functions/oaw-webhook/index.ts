@@ -20,6 +20,14 @@ import { healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import {
+  listLinks,
+  saveReceived,
+  sendConfirmCard,
+  sendErrorText,
+  sendIntent,
+  sendLink,
+} from '../_shared/links.ts';
+import {
   apricoKey,
   bindGroup,
   bindOwner,
@@ -100,6 +108,30 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     return;
   }
   if (event.type === 'postback') {
+    const data = String(event.postback?.data ?? '');
+    if (ownerNow === userId && data === 'link-send-ok') {
+      const p: any = await takePending(userId);
+      if (!p?.linkSend)
+        return void (await reply(noticeCard('已經過期', '請再傳一次「傳給…：…」。')));
+      try {
+        const r = await sendLink(p.linkSend.linkId, 'manual', p.linkSend.text);
+        return void (await reply(
+          noticeCard('✅ 已送出', `已傳給「${p.linkSend.label}」。今天還可以傳 ${r.left} 則。`),
+        ));
+      } catch (e) {
+        return void (await reply(noticeCard('沒有送出', sendErrorText((e as Error).message))));
+      }
+    }
+    const saveId = data.match(/^link-save:([0-9a-f-]{36})$/)?.[1];
+    if (ownerNow === userId && saveId) {
+      const ok = await saveReceived(saveId, userId);
+      return void (await reply(
+        noticeCard(
+          ok ? '📝 已加入今晚整理' : '找不到這則訊息',
+          ok ? '晚上會和其他紀錄一起整理。' : '可能已超過 30 天。',
+        ),
+      ));
+    }
     const health = await healthChat(event, userId, ownerNow, line);
     if (health) return void (await reply(health));
     const index = postbackCell(String(event.postback?.data ?? ''), config);
@@ -109,6 +141,26 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   if (event.type !== 'message' || event.message?.type !== 'text') return;
 
   const owner = await ownerId();
+  // 「傳給設計部：…」 to a linked account: confirm first, then seal and send.
+  if (owner === userId && /^傳給/.test(event.message.text.trim())) {
+    const links = await listLinks().catch(() => []);
+    const want = sendIntent(event.message.text, links);
+    if (want?.link) {
+      await setPending(userId, {
+        linkSend: { linkId: want.link.id, label: want.link.peerLabel, text: want.text },
+      });
+      return void (await reply(sendConfirmCard(want.link.peerLabel, want.text)));
+    }
+    if (want)
+      return void (await reply(
+        noticeCard(
+          `找不到「${want.asked}」`,
+          want.names?.length
+            ? `目前連結的帳號：${want.names.join('、')}`
+            : '還沒有連結其他帳號。到「設定我的 AI 秘書」→「跨帳號連結」建立。',
+        ),
+      ));
+  }
   const health = await healthChat(event, userId, owner, line);
   if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);
