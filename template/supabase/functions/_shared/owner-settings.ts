@@ -4,7 +4,8 @@
 import { notifySettings, ownerNotify, reminders, thresholds } from './health.ts';
 import type { HealthChange } from './settings-reply.ts';
 export { settingsReply } from './settings-reply.ts';
-import { db, env, T } from './store.ts';
+import { validateConfig } from './logic.ts';
+import { db, env, saveConfig, T } from './store.ts';
 
 /** Current health settings for the model; caregivers by index and name, never their LINE id. */
 export async function healthSnapshot() {
@@ -28,6 +29,14 @@ export async function healthSnapshot() {
       caregivers: list.map((c: any, index: number) => ({ index, ...notifySettings(c.notify) })),
     },
   };
+}
+
+/** Apply a confirmed proposal (menu config and/or health). Returns false when empty. */
+export async function applyProposal(p: { config?: unknown; health?: any } | null) {
+  if (!p?.config && !p?.health) return false;
+  if (p.config) await saveConfig(validateConfig(p.config));
+  if (p.health) await applyHealth(p.health);
+  return true;
 }
 
 /** Apply a confirmed health change (the menu config is saved by the caller). */

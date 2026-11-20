@@ -106,11 +106,21 @@ export function normalizeBindCode(raw = '') {
     .replace(/[\s-]/g, '');
 }
 
-export function seedSql(px, config, rawBindCode) {
+export function seedSql(px, config, rawBindCode, resetNonce = '') {
   const bindCode = normalizeBindCode(rawBindCode);
   const json = JSON.stringify(config);
   if (json.includes('$oaw$')) throw Error('config contains a reserved sequence');
   let sql = `insert into public.${px}_config (id, data) values (1, $oaw$${json}$oaw$::jsonb) on conflict (id) do nothing;\n`;
+  // Ownership recovery from the Aprico build center (proved with GitHub): clear the owner
+  // and the PIN once per reset request, so the new bind code below can be used.
+  if (resetNonce) {
+    if (!/^[a-f0-9]{32}$/.test(resetNonce)) throw Error('OAW_OWNER_RESET 格式不正確');
+    if (!bindCode) throw Error('找回老闆需要新的綁定碼（OAW_BIND_CODE）');
+    sql +=
+      `update public.${px}_owner set line_user_id = null, pin_hash = null, pin_fails = 0, ` +
+      `pin_wait_until = null, pin_ok_until = null, reset_nonce = '${resetNonce}' ` +
+      `where id = 1 and reset_nonce is distinct from '${resetNonce}';\n`;
+  }
   if (bindCode) {
     if (!/^\d{6}$/.test(bindCode)) throw Error('OAW_BIND_CODE 必須是 6 位數字');
     const hash = createHash('sha256').update(bindCode).digest('hex');
@@ -215,7 +225,8 @@ async function main() {
   Object.assign(status, { px, pages_url: pagesUrl, project_ref: previous.project_ref ?? null });
   const schema = render(px);
   step('render');
-  if (DRY) return console.log(seedSql(px, config, E('OAW_BIND_CODE')) + schema);
+  if (DRY)
+    return console.log(seedSql(px, config, E('OAW_BIND_CODE'), E('OAW_OWNER_RESET')) + schema);
 
   const sbToken = E('SUPABASE_ACCESS_TOKEN');
   const msg = { id: E('OAW_LINE_MSG_ID'), secret: E('OAW_LINE_MSG_SECRET') };
@@ -249,7 +260,7 @@ async function main() {
   await api(SB, `/v1/projects/${ref}/database/query`, {
     token: sbToken,
     method: 'POST',
-    body: { query: seedSql(px, config, E('OAW_BIND_CODE')) },
+    body: { query: seedSql(px, config, E('OAW_BIND_CODE'), E('OAW_OWNER_RESET')) },
   });
   step('database');
 

@@ -17,7 +17,8 @@ import {
 } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
 import { healthChat } from '../_shared/health-chat.ts';
-import { applyHealth, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
+import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
+import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import {
   apricoKey,
   bindGroup,
@@ -87,8 +88,19 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     if (config.welcome) await reply(noticeCard(config.oaName || '歡迎', config.welcome));
     return;
   }
+  // Emergency lock (set from Aprico): every owner function stops; friends are unaffected.
+  const ownerNow = await ownerId();
+  if (ownerNow && ownerNow === userId && (await ownerLocked()) === true) {
+    await reply(
+      noticeCard(
+        '🔒 此帳號已鎖定',
+        '管理功能已暫停。如果是你本人鎖定的，請到 Aprico 建置中心用 GitHub 驗證後解鎖。',
+      ),
+    );
+    return;
+  }
   if (event.type === 'postback') {
-    const health = await healthChat(event, userId, await ownerId(), line);
+    const health = await healthChat(event, userId, ownerNow, line);
     if (health) return void (await reply(health));
     const index = postbackCell(String(event.postback?.data ?? ''), config);
     if (index >= 0) await reply(cellMessage(config, index));
@@ -169,14 +181,27 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       await reply(noticeCard('已取消', '這次修改不會套用。'));
       return;
     case 'apply': {
-      const proposal = (await takePending(userId)) as { config?: unknown; health?: any } | null;
-      if (!proposal?.config && !proposal?.health) {
+      const liff = env('LIFF_URL');
+      try {
+        await guardOwner(userId, true);
+      } catch (e) {
+        const code = (e as Error).message;
+        // The proposal stays pending; the PIN page applies it after the PIN is checked.
+        await reply(
+          code === 'pin_required'
+            ? noticeCard(
+                '🔐 請輸入 PIN 確認',
+                '套用設定前需要你的 PIN。',
+                liff ? { label: '輸入 PIN 並套用', uri: `${liff}?view=confirm` } : undefined,
+              )
+            : noticeCard('暫時無法套用', '目前無法確認帳號狀態，請稍後再回覆「套用」。'),
+        );
+        return;
+      }
+      if (!(await applyProposal((await takePending(userId)) as any))) {
         await reply(noticeCard('沒有待套用的修改', '想調整時，傳「修改：你的需求」給我。'));
         return;
       }
-      if (proposal.config) await saveConfig(validateConfig(proposal.config));
-      if (proposal.health) await applyHealth(proposal.health);
-      const liff = env('LIFF_URL');
       await reply(
         noticeCard(
           '✅ 已套用',
@@ -205,7 +230,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         return;
       }
       const proposed = validateConfig(data.config);
-      await setPending(userId, { config: proposed });
+      await setPending(userId, { config: proposed, summary: data.summary.slice(0, 300) });
       await reply(
         noticeCard('🎨 修改提案', `${data.summary}\n\n回覆「套用」確認，或回覆「取消」。`),
       );
@@ -229,7 +254,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           return;
         }
         if (s?.kind === 'change') {
-          await setPending(userId, { config: s.config, health: s.health });
+          await setPending(userId, { config: s.config, health: s.health, summary: s.summary });
           await reply(
             noticeCard('⚙️ 設定修改提案', `${s.summary}\n\n回覆「套用」確認，或回覆「取消」。`),
           );

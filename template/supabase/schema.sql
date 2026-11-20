@@ -16,6 +16,12 @@ create table if not exists public.__px___owner (
 );
 -- Saved by the one-tap connect from the Aprico OA.
 alter table public.__px___owner add column if not exists aprico_key text;
+-- Owner PIN (hash only) and the last ownership reset applied from the Aprico build center.
+alter table public.__px___owner add column if not exists pin_hash text;
+alter table public.__px___owner add column if not exists pin_fails int not null default 0;
+alter table public.__px___owner add column if not exists pin_wait_until timestamptz;
+alter table public.__px___owner add column if not exists pin_ok_until timestamptz;
+alter table public.__px___owner add column if not exists reset_nonce text;
 
 create table if not exists public.__px___members (
   line_user_id text primary key,
