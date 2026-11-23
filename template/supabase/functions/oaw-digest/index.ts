@@ -2,7 +2,7 @@
 // by the repo's oaw-nightly workflow. Auth: HMAC of the date with the LINE channel secret,
 // which both the workflow (GitHub secret) and this function (Supabase secret) already hold.
 import { lineClient, statelessToken } from '../_shared/line.ts';
-import { digestCard, digestKey, digestRows } from '../_shared/digest.ts';
+import { digestCard, digestKey, digestRows, mergeDigests } from '../_shared/digest.ts';
 import { noticeCard, quotaCard } from '../_shared/onboarding.ts';
 import { autoSend } from '../_shared/links.ts';
 import {
@@ -12,6 +12,7 @@ import {
   onceToday,
   ownerId,
   pendingMessages,
+  pendingSources,
   purgeOldMessages,
   saveRecords,
 } from '../_shared/store.ts';
@@ -31,40 +32,55 @@ Deno.serve(async (req) => {
     key = await apricoKey(),
     owner = await ownerId();
   if (!base || !key || !owner) return json({ skipped: 'not_configured' });
-  const msgs = await pendingMessages();
-  if (!msgs.length) return json({ messages: 0 });
+  const sources = (await pendingSources()).slice(0, 8);
+  if (!sources.length) return json({ messages: 0 });
 
   const fmt = (iso: string) =>
     new Date(iso).toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
-  const res = await fetch(`${base}/digest`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      requestId: `digest-${today}-${msgs[0].id}`,
-      messages: msgs.map((m) => ({
-        at: fmt(m.sent_at),
-        who: m.is_owner ? 'owner' : 'friend',
-        text: m.text,
-      })),
-    }),
-  });
   const token = await statelessToken(env('LINE_MSG_ID'), secret);
   const line = lineClient(token);
-  if (res.status === 402) {
-    if (await onceToday('quota'))
-      await line.push(owner, [
-        noticeCard('今天的紀錄先保留', '額度恢復後會一起整理，不會遺漏。'),
-        quotaCard(env('APRICO_SUBSCRIBE_URL')),
-      ]);
-    return json({ error: 'points_insufficient' }, 402);
+  // Each chat (a group, or the owner's own notes) is read separately so its records keep
+  // their source; the owner still gets one card for the whole day.
+  const digests = [];
+  let count = 0,
+    records = 0;
+  for (const src of sources) {
+    const msgs = await pendingMessages(9000, src);
+    if (!msgs.length) continue;
+    const res = await fetch(`${base}/digest`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: `digest-${today}-${src.slice(-10)}-${msgs[0].id}`,
+        messages: msgs.map((m) => ({
+          at: fmt(m.sent_at),
+          who: m.is_owner ? 'owner' : 'friend',
+          text: m.text,
+        })),
+      }),
+    });
+    if (res.status === 402) {
+      if (await onceToday('quota'))
+        await line.push(owner, [
+          noticeCard('今天的紀錄先保留', '額度恢復後會一起整理，不會遺漏。'),
+          quotaCard(env('APRICO_SUBSCRIBE_URL')),
+        ]);
+      break;
+    }
+    if (!res.ok) continue;
+    const digest = await res.json();
+    const rows = digestRows(digest, src);
+    await saveRecords(rows);
+    await markProcessed(msgs.map((m) => m.id));
+    digests.push(digest);
+    count += msgs.length;
+    records += rows.length;
   }
-  if (!res.ok) return json({ error: 'aprico_failed', status: res.status }, 502);
-  const digest = await res.json();
-  await saveRecords(digestRows(digest));
-  await markProcessed(msgs.map((m) => m.id));
+  if (!digests.length) return json({ messages: 0, error: 'nothing_processed' });
+  const digest = mergeDigests(digests);
   const card = digestCard(digest, env('LIFF_URL'));
   if (card) await line.push(owner, [card]);
   // Copies to linked accounts that opened them (each side's scope is checked by Aprico).
   const linked = await autoSend(digest).catch(() => 0);
-  return json({ messages: msgs.length, records: digestRows(digest).length, linked });
+  return json({ messages: count, records, linked });
 });

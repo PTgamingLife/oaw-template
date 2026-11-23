@@ -17,6 +17,7 @@ import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
 import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
+import { groupAction } from '../_shared/groups.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
@@ -144,6 +145,11 @@ Deno.serve(async (req) => {
         return respond(await aprLink('scope', { linkId: body.linkId, scope: body.scope }));
       if (body.action === 'link_revoke')
         return respond(await aprLink('revoke', { linkId: body.linkId }));
+    }
+    if (['group_list', 'group_save', 'group_unbind'].includes(body.action)) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, body.action !== 'group_list');
+      return respond(await groupAction(body.action, body));
     }
     if (body.action === 'pending_peek' || body.action === 'pending_apply') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

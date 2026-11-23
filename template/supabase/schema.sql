@@ -87,6 +87,14 @@ create table if not exists public.__px___records (
   amount integer,
   created_at timestamptz not null default now()
 );
+-- Groups: LINE group name (owner can rename), and which chat each record came from.
+alter table public.__px___groups add column if not exists name text not null default '';
+alter table public.__px___records add column if not exists source_id text;
+create index if not exists __px___records_source on public.__px___records (source_id, kind, day);
+-- Group AI: call word, AI calls per group per day, owner announcements per day.
+alter table public.__px___owner add column if not exists group_wake text not null default '小秘';
+alter table public.__px___owner add column if not exists group_daily int not null default 30;
+alter table public.__px___owner add column if not exists group_send_daily int not null default 20;
 
 alter table public.__px___groups enable row level security;
 alter table public.__px___messages enable row level security;

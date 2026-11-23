@@ -30,13 +30,14 @@ test('record rows all share the same keys for bulk insert', () => {
   const rows = digestRows(sample);
   assert.equal(rows.length, 4);
   for (const r of rows)
-    assert.deepEqual(Object.keys(r).sort(), ['amount', 'day', 'kind', 'time', 'title']);
+    assert.deepEqual(Object.keys(r).sort(), ['amount', 'day', 'kind', 'source_id', 'time', 'title']);
   assert.deepEqual(rows[2], {
     kind: 'expense',
     day: '2026-11-12',
     time: '',
     title: '支出',
     amount: 80,
+    source_id: null,
   });
 });
 
