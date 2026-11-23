@@ -1,0 +1,132 @@
+// 光球 storage and the 「確認」 step for one OA app. Shapes and checks live in orb-model.ts;
+// Aprico's /orb turns the owner's plain words into piece parameters (billed to the owner).
+import { listGroups } from './groups.ts';
+import {
+  cleanOrb,
+  cleanParams,
+  defaultOrbs,
+  localIssues,
+  menuButtons,
+  orbReady,
+  PIECE_NAME,
+  type Issue,
+  type Orb,
+} from './orb-model.ts';
+import { apricoKey, db, env, T } from './store.ts';
+
+export async function loadOrbs(): Promise<Orb[]> {
+  const groups = (await listGroups()).map((g) => g.group_id);
+  const { data, error } = await db.from(T('orbs')).select('slot,data').order('slot');
+  if (error) throw Error('orbs_unavailable');
+  const base = defaultOrbs();
+  if (!data?.length) {
+    // First visit: orb 1 starts lit with the calendar secretary.
+    await db.from(T('orbs')).upsert(base.map((o) => ({ slot: o.slot, data: o })));
+    return base;
+  }
+  const saved = new Map(data.map((r: { slot: number; data: unknown }) => [r.slot, r.data]));
+  return [1, 2, 3, 4].flatMap((slot) => {
+    const row = saved.get(slot);
+    if (!row) return slot === 4 ? [] : [base[slot - 1]];
+    try {
+      return [cleanOrb(row, slot, groups)];
+    } catch {
+      return slot === 4 ? [] : [{ ...base[slot - 1], on: false, pieces: [], links: [], target: '' }];
+    }
+  });
+}
+
+async function saveOrb(orb: Orb) {
+  const { error } = await db
+    .from(T('orbs'))
+    .upsert({ slot: orb.slot, data: orb, updated_at: new Date().toISOString() });
+  if (error) throw Error('orb_save_failed');
+}
+
+async function view(orbs: Orb[]) {
+  return {
+    orbs,
+    buttons: menuButtons(orbs),
+    groups: (await listGroups()).map((g, i) => ({ id: g.group_id, name: g.name || `群組 ${i + 1}` })),
+  };
+}
+
+const slotOf = (v: unknown) => {
+  if (![1, 2, 3].includes(v as number)) throw Error('orb_invalid');
+  return v as number;
+};
+
+/** LIFF actions: orb_list, orb_save (draft), orb_check (AI), orb_toggle. Owner only. */
+export async function orbAction(action: string, body: any, requestId: string) {
+  const orbs = await loadOrbs();
+  if (action === 'orb_list') return view(orbs);
+  const slot = slotOf(body.slot);
+  const groups = (await listGroups()).map((g) => g.group_id);
+  const at = orbs.findIndex((o) => o.slot === slot);
+  const put = async (orb: Orb) => {
+    orbs[at] = orb;
+    await saveOrb(orb);
+  };
+
+  if (action === 'orb_toggle') {
+    const orb = orbs[at];
+    if (body.on === true && !orbReady(orb, orbs)) throw Error('orb_not_ready');
+    await put({ ...orb, on: body.on === true });
+    return view(orbs);
+  }
+
+  const orb = cleanOrb(body.orb, slot, groups);
+  if (action === 'orb_save') {
+    // A draft: an orb that is no longer complete goes dark until it is confirmed again.
+    await put({ ...orb, on: orb.on && orbReady(orb, orbs) });
+    return view(orbs);
+  }
+  if (action !== 'orb_check') throw Error('unknown_action');
+
+  let issues: Issue[] = localIssues(orb, orbs);
+  let note = '';
+  if (!issues.length) {
+    const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
+    const base = env('APRICO_URL'),
+      key = await apricoKey();
+    if (!base || !key) throw Error('aprico_not_connected');
+    const res = await fetch(`${base}/orb`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        target: orb.target === 'me' ? 'me' : 'group',
+        pieces: orb.pieces.map((p) => ({
+          id: p.id,
+          type: p.type,
+          text: p.text,
+          ...(typeof answers[p.id] === 'string' && answers[p.id].trim()
+            ? { answer: answers[p.id].slice(0, 200) }
+            : {}),
+        })),
+      }),
+      signal: AbortSignal.timeout(60000),
+    }).catch(() => null);
+    if (res?.status === 402) throw Error('points_insufficient');
+    if (res?.status === 429) throw Error('rate_limited');
+    const data = res?.ok ? await res.json().catch(() => null) : null;
+    if (!Array.isArray(data?.pieces)) throw Error('orb_check_failed');
+    for (const p of orb.pieces) {
+      const got = data.pieces.find((x: any) => x?.id === p.id);
+      if (!got) throw Error('orb_check_failed');
+      if (typeof got.text === 'string' && got.text.trim()) p.text = got.text.trim().slice(0, 200);
+      const question = typeof got.question === 'string' ? got.question.trim().slice(0, 200) : '';
+      p.params = question ? null : cleanParams(p.type, got.params);
+      if (!p.params)
+        issues.push({
+          piece: p.id,
+          code: 'ask',
+          text: question || `「${PIECE_NAME[p.type]}」還缺少必要的資訊，請再說清楚一點。`,
+        });
+    }
+    note = issues.length || typeof data.note !== 'string' ? '' : data.note.slice(0, 300);
+  }
+  // Confirming never lights the orb by itself; the owner presses 啟動 (orb_toggle) after this.
+  await put({ ...orb, on: orb.on && !issues.length });
+  return { ...(await view(orbs)), issues, note, ready: !issues.length };
+}

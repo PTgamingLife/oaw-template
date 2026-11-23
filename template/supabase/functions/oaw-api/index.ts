@@ -18,6 +18,7 @@ import { healthAction } from '../_shared/health-api.ts';
 import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
 import { groupAction } from '../_shared/groups.ts';
+import { orbAction } from '../_shared/orbs.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
@@ -145,6 +146,11 @@ Deno.serve(async (req) => {
         return respond(await aprLink('scope', { linkId: body.linkId, scope: body.scope }));
       if (body.action === 'link_revoke')
         return respond(await aprLink('revoke', { linkId: body.linkId }));
+    }
+    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle'].includes(body.action)) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, body.action !== 'orb_list');
+      return respond(await orbAction(body.action, body, `orb-${crypto.randomUUID()}`));
     }
     if (['group_list', 'group_save', 'group_unbind'].includes(body.action)) {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

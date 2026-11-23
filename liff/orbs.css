@@ -1,0 +1,138 @@
+/* 光球 page (?view=orbs). Rules are scoped to #orbs-stage; colours are this page's own. */
+#orbs-stage{
+  --sky-1:#EDE7FB; --sky-2:#D9E4FB; --sky-3:#F7F2FF;
+  --ink:#2B2A4A; --ink-soft:#6B6A8C; --accent:#7C8CF0; --accent-deep:#5866D6;
+  --paper:#FFFFFF; --line:#C9CEF2; --warn:#E0667F; --ok:#3FAE8C;
+  --font:'Noto Sans TC',system-ui,-apple-system,'PingFang TC','Microsoft JhengHei',sans-serif;
+}
+body.orbs-mode{margin:0;height:100dvh;overflow:hidden;background:linear-gradient(160deg,#EDE7FB,#D9E4FB 55%,#F7F2FF);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.orbs-mode main{max-width:none;height:100%;padding:0;margin:0}
+#orbs-stage{color:var(--ink);font-family:var(--font);position:relative;height:100%;max-width:460px;margin:0 auto;display:flex;flex-direction:column;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#orbs-stage .view{flex:1;min-height:0;display:flex;flex-direction:column}
+#orbs-stage h1{font-size:20px;font-weight:900;margin:6px 0 2px;text-wrap:balance}
+#orbs-stage .sub{color:var(--ink-soft);font-size:13px;margin:0}
+#orbs-stage button{font-family:inherit;color:inherit}
+#orbs-stage button:focus-visible,#orbs-stage select:focus-visible,#orbs-stage textarea:focus-visible,#orbs-stage input:focus-visible{outline:3px solid var(--accent-deep);outline-offset:2px}
+#orbs-stage .btn3d{border:0;border-radius:999px;padding:10px 20px;font-weight:700;font-size:15px;color:#fff;cursor:pointer;
+  background:linear-gradient(180deg,#9AA7FF,var(--accent) 55%,var(--accent-deep));
+  box-shadow:0 6px 0 #4350B8,0 14px 22px rgba(88,102,214,.38),inset 0 2px 0 rgba(255,255,255,.55);
+  transition:transform .12s,box-shadow .12s}
+#orbs-stage .btn3d:active{transform:translateY(5px);box-shadow:0 1px 0 #4350B8,0 5px 10px rgba(88,102,214,.3),inset 0 2px 0 rgba(255,255,255,.4)}
+#orbs-stage .btn3d.ghost{color:var(--accent-deep);background:linear-gradient(180deg,#fff,#EEF0FF);
+  box-shadow:0 5px 0 var(--line),0 12px 18px rgba(88,102,214,.18),inset 0 2px 0 #fff}
+#orbs-stage .btn3d.ghost:active{box-shadow:0 1px 0 var(--line)}
+#orbs-stage .btn3d.small{padding:7px 14px;font-size:13px}
+#orbs-stage .sky{flex:1;min-height:0;position:relative}
+#orbs-stage .orbs{position:absolute;inset:4% 0 auto 0;height:44%}
+#orbs-stage .orb{position:absolute;width:26%;aspect-ratio:1;border:0;padding:0;background:none;cursor:pointer;
+  animation:float 4.5s ease-in-out infinite;touch-action:manipulation}
+#orbs-stage .orb:nth-child(1){left:4%;top:38%}
+#orbs-stage .orb:nth-child(2){left:37%;top:2%;animation-delay:-1.5s}
+#orbs-stage .orb:nth-child(3){left:70%;top:38%;animation-delay:-3s}
+#orbs-stage .orb .ball{display:block;width:100%;height:100%;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#fff 0 14%,#FFF6C9 26%,#FFE07A 50%,#FFC53D 76%,#FFA826);
+  box-shadow:0 0 0 5px rgba(255,248,214,.75),0 0 26px 10px rgba(255,214,92,.9),0 0 70px 28px rgba(255,190,60,.55),
+    inset -6px -10px 16px rgba(240,140,20,.35),inset 6px 8px 14px rgba(255,255,255,.7);
+  animation:glow 2.6s ease-in-out infinite}
+#orbs-stage .orb:not(.off)::before{content:"";position:absolute;inset:-38%;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle closest-side,rgba(255,226,130,.6) 0 30%,rgba(255,214,110,.22) 52%,transparent 70%);animation:halo 2.6s ease-in-out infinite}
+@keyframes glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.14)}}
+@keyframes halo{0%,100%{transform:scale(.9);opacity:.75}50%{transform:scale(1.08);opacity:1}}
+#orbs-stage .orb .ball,#orbs-stage .orb .tag{position:relative}
+#orbs-stage .orb .tag{position:absolute}
+#orbs-stage .orb.off .ball{animation:none;background:radial-gradient(circle at 32% 28%,#fff 0 6%,#E9EAF3 22%,#C9CCDD 60%,#AEB2C8);
+  box-shadow:0 0 0 6px rgba(255,255,255,.25),0 12px 18px rgba(90,95,130,.2),inset -8px -12px 18px rgba(110,115,150,.25);opacity:.75}
+#orbs-stage .orb.hidden-orb .ball{background:radial-gradient(circle at 32% 28%,#fff 0 9%,#FFE7F1 18%,#FFB3CF 50%,#EE7FA8 80%,#D9608F)}
+#orbs-stage .orb .tag{position:absolute;left:50%;top:104%;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:700;
+  background:rgba(255,255,255,.8);border-radius:999px;padding:3px 10px;box-shadow:0 4px 10px rgba(88,102,214,.15)}
+#orbs-stage .orb .tag small{font-weight:500;color:var(--ink-soft)}
+#orbs-stage .orb.wake .ball{animation:wake 1s ease-out}
+@keyframes wake{0%{transform:scale(.7);filter:brightness(2)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+#orbs-stage .mascot{position:absolute;left:50%;bottom:6%;width:46%;max-height:46%;transform:translateX(-50%);display:grid;place-items:center}
+#orbs-stage .mascot img{width:100%;height:auto;max-height:100%;object-fit:contain;transform-origin:50% 90%;filter:drop-shadow(0 18px 14px rgba(88,102,214,.28))}
+#orbs-stage .mascot .mood{position:absolute;top:-6%;right:-14%;font-size:12px;font-weight:700;background:#fff;border-radius:14px 14px 14px 4px;
+  padding:4px 10px;box-shadow:0 6px 12px rgba(88,102,214,.2);opacity:0;transition:opacity .3s}
+#orbs-stage .mascot .mood.show{opacity:1}
+#orbs-stage .m-hop{animation:hop .9s ease 2}
+#orbs-stage .m-tilt{animation:tilt 1.6s ease}
+#orbs-stage .m-spin{animation:think 1.8s ease}
+#orbs-stage .m-pop{animation:pop .7s cubic-bezier(.3,1.6,.5,1)}
+#orbs-stage .m-proud{animation:proud 1.6s ease}
+#orbs-stage .m-shy{animation:shy 1.4s ease}
+#orbs-stage .m-sleep{animation:sleep 2.4s ease}
+#orbs-stage .m-step{animation:step .5s ease 3}
+@keyframes hop{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-22px) scale(.97,1.04)}60%{transform:translateY(0) scale(1.05,.93)}}
+@keyframes tilt{0%,100%{transform:rotate(0)}40%,70%{transform:rotate(11deg)}}
+@keyframes think{0%,100%{transform:rotate(0)}25%{transform:rotate(-6deg) translateY(-4px)}75%{transform:rotate(6deg) translateY(-4px)}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.14) translateY(-14px)}100%{transform:scale(1)}}
+@keyframes proud{0%,100%{transform:scale(1)}30%,70%{transform:scale(1.07,1.1) translateY(-6px)}50%{transform:scale(1.07,1.1) translateY(-6px) rotate(-3deg)}}
+@keyframes shy{0%,100%{transform:rotate(0)}20%,60%{transform:rotate(-7deg) scale(.96)}40%,80%{transform:rotate(7deg) scale(.96)}}
+@keyframes sleep{0%,100%{transform:rotate(0)}30%,55%{transform:rotate(9deg) translateY(6px) scale(1,.96)}75%{transform:rotate(-2deg)}}
+@keyframes step{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-7px) rotate(-4deg)}75%{transform:translateX(7px) rotate(4deg)}}
+#orbs-stage .menu{background:rgba(255,255,255,.7);border-radius:18px;padding:10px 12px;display:grid;gap:6px}
+#orbs-stage .menu p{margin:0;font-size:12px;color:var(--ink-soft)}
+#orbs-stage .menu .cells{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#orbs-stage .menu .cell{background:#fff;border-radius:12px;padding:9px 2px;text-align:center;font-size:12px;font-weight:700;
+  box-shadow:0 3px 0 var(--line);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#orbs-stage .menu .cell.empty{color:#B9BCD3;font-weight:500;box-shadow:none;border:1px dashed var(--line)}
+#orbs-stage .bar{display:flex;align-items:center;gap:8px}
+#orbs-stage .bar h1{flex:1;min-width:0;margin:0;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#orbs-stage .back{border:0;background:rgba(255,255,255,.8);width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;
+  box-shadow:0 4px 0 var(--line)}
+#orbs-stage .target{display:flex;align-items:center;gap:8px;margin:10px 0 8px;font-size:13px;color:var(--ink-soft)}
+#orbs-stage .target select{flex:1;min-width:0;font:inherit;font-weight:700;color:var(--ink);border:0;border-radius:12px;padding:9px 10px;background:#fff;
+  box-shadow:0 3px 0 var(--line)}
+#orbs-stage #plane{flex:1;min-height:0;position:relative;border-radius:22px;overflow:hidden;touch-action:none;
+  background-color:rgba(255,255,255,.72);background-image:radial-gradient(#B9C1F3 1.6px,transparent 1.7px);background-size:20px 20px;
+  box-shadow:inset 0 2px 10px rgba(88,102,214,.18)}
+#orbs-stage #plane svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#orbs-stage #plane .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-soft);font-size:14px;text-align:center;padding:20px}
+#orbs-stage .piece{position:absolute;width:86px;height:70px;margin:-35px 0 0 -43px;border:0;cursor:grab;font-weight:900;font-size:14px;color:#fff;
+  display:grid;place-items:center;text-shadow:0 1px 2px rgba(0,0,0,.25);touch-action:none;
+  box-shadow:0 5px 0 rgba(0,0,0,.16),0 12px 16px rgba(60,70,170,.25),inset 0 2px 0 rgba(255,255,255,.45)}
+#orbs-stage .piece::after{content:"";position:absolute;right:-9px;top:50%;width:20px;height:20px;margin-top:-10px;border-radius:50%;background:inherit;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.35)}
+#orbs-stage .piece small{display:block;font-size:10px;font-weight:500;opacity:.95}
+#orbs-stage .piece.sel{outline:3px solid var(--ink);outline-offset:3px}
+#orbs-stage .piece.linking{animation:float 1.2s ease-in-out infinite}
+#orbs-stage .piece.todo::before{content:"!";position:absolute;left:-6px;top:-8px;width:20px;height:20px;border-radius:50%;background:var(--warn);
+  font-size:13px;line-height:20px;text-align:center;text-shadow:none}
+#orbs-stage .s-record{background:#7C8CF0;border-radius:26px 26px 26px 10px}
+#orbs-stage .s-organize{background:#6FC3B0;border-radius:40% 60% 55% 45%/55% 45% 55% 45%}
+#orbs-stage .s-command{background:#F29BB7;border-radius:50% 50% 46% 46%/62% 62% 38% 38%}
+#orbs-stage .s-push{background:#F0B36B;border-radius:18px 34px 18px 34px}
+#orbs-stage .s-remind{background:#A78BF0;border-radius:50%}
+#orbs-stage .s-stats{background:#5FB0E8;border-radius:12px 12px 30px 30px}
+#orbs-stage .s-announce{background:#EE8C7A;border-radius:30px 12px 30px 12px}
+#orbs-stage .s-answer{background:#8FBF6A;border-radius:34px 34px 34px 6px}
+#orbs-stage .tray{margin-top:10px;background:rgba(255,255,255,.75);border-radius:20px;padding:10px 6px 12px}
+#orbs-stage .tray p{margin:0 8px 8px;font-size:12px;color:var(--ink-soft)}
+#orbs-stage .tray .row{display:flex;gap:16px;overflow-x:auto;padding:6px 14px 8px;scrollbar-width:none}
+#orbs-stage .tray .row::-webkit-scrollbar{display:none}
+#orbs-stage .tray .piece{position:relative;flex:none;margin:0;cursor:pointer;touch-action:manipulation}
+#orbs-stage .tray .piece.used{opacity:.35}
+#orbs-stage .pop{position:absolute;z-index:5;display:flex;gap:6px;background:#fff;border-radius:16px;padding:6px;
+  box-shadow:0 10px 24px rgba(60,70,170,.3);transform:translate(-50%,-100%)}
+#orbs-stage .pop button{border:0;background:#F1F2FF;border-radius:11px;padding:8px 12px;font-weight:700;font-size:13px;cursor:pointer}
+#orbs-stage .pop button.danger{color:var(--warn);background:#FFF0F3}
+#orbs-stage .banner{position:absolute;left:10px;right:10px;top:10px;z-index:6;background:var(--ink);color:#fff;border-radius:14px;padding:8px 12px;
+  font-size:13px;display:flex;align-items:center;gap:8px}
+#orbs-stage .banner span{flex:1}
+#orbs-stage .scrim{position:absolute;inset:0;z-index:20;background:rgba(43,42,74,.38);display:flex;align-items:flex-end;justify-content:center}
+#orbs-stage .scrim.center{align-items:center;padding:0 22px}
+#orbs-stage .sheet{width:100%;background:#fff;border-radius:24px 24px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:12px;
+  box-shadow:0 -10px 30px rgba(43,42,74,.25);max-height:86%;overflow:auto}
+#orbs-stage .scrim.center .sheet{border-radius:24px}
+#orbs-stage .sheet h2{margin:0;font-size:17px;font-weight:900}
+#orbs-stage .sheet p{margin:0;font-size:14px;line-height:1.6;color:var(--ink-soft)}
+#orbs-stage .sheet textarea,#orbs-stage .sheet input{font:inherit;color:var(--ink);border:2px solid var(--line);border-radius:14px;padding:10px 12px;width:100%;
+  box-sizing:border-box;resize:none;-webkit-user-select:text;user-select:text}
+#orbs-stage .sheet .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding-bottom:6px}
+#orbs-stage .sheet ul{margin:0;padding-left:18px;font-size:14px;line-height:1.7}
+#orbs-stage .issue{background:#FFF4F6;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.6;color:var(--ink)}
+#orbs-stage .good{background:#EEFAF5;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.7;color:var(--ink)}
+#orbs-stage .note{font-size:11px;color:var(--ink-soft);text-align:center;margin:6px 0 0}
+@media (prefers-reduced-motion:reduce){#orbs-stage *{animation:none!important;transition:none!important}}
+#orbs-stage .busy{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(237,231,251,.7);font-weight:700}

@@ -39,6 +39,16 @@ alter table public.__px___link_inbox enable row level security;
 revoke all on public.__px___link_inbox from public, anon, authenticated;
 grant select, insert, update, delete on public.__px___link_inbox to service_role;
 
+-- 光球: slots 1–3 are the owner's orbs, 4 is a hidden orb received from a 領航者 account.
+create table if not exists public.__px___orbs (
+  slot int primary key check (slot between 1 and 4),
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.__px___orbs enable row level security;
+revoke all on public.__px___orbs from public, anon, authenticated;
+grant select, insert, update, delete on public.__px___orbs to service_role;
+
 create table if not exists public.__px___members (
   line_user_id text primary key,
   member_no bigint generated always as identity unique,
