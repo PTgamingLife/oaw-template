@@ -258,8 +258,8 @@ async function settingsView(view) {
     h(
       'nav',
       { class: 'tabs' },
-      tab('secretary', '設定我的 AI 秘書'),
-      tab('interface', '設定我的介面'),
+      tab('secretary', '秘書設定'),
+      tab('interface', '介面設定'),
     ),
     data.paid
       ? quotaBars(data)

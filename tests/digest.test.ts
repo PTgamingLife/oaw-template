@@ -43,7 +43,7 @@ test('record rows all share the same keys for bulk insert', () => {
 
 test('summary card lists sections with a total, and is skipped when empty', () => {
   const json = JSON.stringify(digestCard(sample, 'https://liff.line.me/1-a'));
-  for (const s of ['看牙醫', '共 200 元', '週五前交報價單', '今天也辛苦了', '?view=secretary'])
+  for (const s of ['看牙醫', '共 200 元', '週五前交報價單', '今天也辛苦了', '?view=orbs'])
     assert.ok(json.includes(s), s);
   assert.ok(!json.includes('生活紀錄'));
   assert.equal(digestCard({ summary: 'x' }), null);

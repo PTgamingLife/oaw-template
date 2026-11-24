@@ -76,7 +76,7 @@ export function pickGroupMessage(groups: Group[]) {
 const button = (text: string, data: string, primary = false) => ({
   type: 'button',
   style: primary ? 'primary' : 'secondary',
-  color: primary ? BRAND.ink : undefined,
+  color: primary ? BRAND.button : undefined,
   height: 'sm',
   action: { type: 'postback', label: text, data, displayText: text },
 });

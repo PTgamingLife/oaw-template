@@ -98,11 +98,11 @@ export function digestCard(d: Digest, liffUrl = '', title = '🌙 今天的整�
                 {
                   type: 'button',
                   style: 'primary',
-                  color: BRAND.ink,
+                  color: BRAND.button,
                   action: {
                     type: 'uri',
-                    label: '設定我的 AI 秘書',
-                    uri: `${liffUrl}?view=secretary`,
+                    label: '打開秘書',
+                    uri: `${liffUrl}?view=orbs`,
                   },
                 },
               ],

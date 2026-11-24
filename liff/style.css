@@ -1,10 +1,11 @@
 :root {
-  --bg: #f7f6f2;
+  /* The secretary look (same as orbs.css): lavender-blue sky, navy text. */
+  --bg: #edeffb;
   --card: #ffffff;
-  --text: #2b2b2b;
-  --muted: #6f6f6f;
-  --line: #e4e2dc;
-  --accent: #bdd0be;
+  --text: #2b2a4a;
+  --muted: #6b6a8c;
+  --line: #c9cef2;
+  --accent: #7c8cf0;
 }
 * {
   box-sizing: border-box;
@@ -97,15 +98,14 @@ canvas {
   color: #b42318;
 }
 
-/* Owner settings pages: Aprico brand (warm apricot) with the logo pattern. */
+/* Owner settings pages: the secretary look (lavender-blue sky), same as the orb page. */
 body.brand {
-  --bg: #faf7f2;
-  --accent: #e7c5a8;
-  --text: #4a3b32;
-  --muted: #7a6a60;
-  --line: #eadfd3;
-  background: #faf7f2 url('assets/pattern.png') repeat;
-  background-size: 160px;
+  --bg: #edeffb;
+  --accent: #7c8cf0;
+  --text: #2b2a4a;
+  --muted: #6b6a8c;
+  --line: #c9cef2;
+  background: linear-gradient(160deg, #ede7fb, #d9e4fb 55%, #f7f2ff) fixed;
 }
 .brand-head {
   display: flex;
@@ -267,7 +267,7 @@ body.brand {
 .health .check input {
   width: 24px;
   height: 24px;
-  accent-color: #4a3b32;
+  accent-color: #5866d6;
 }
 .health .check.done span {
   color: var(--muted);
@@ -296,9 +296,9 @@ body.brand {
   font-size: 15px;
 }
 .health .seg button.on {
-  background: #4a3b32;
+  background: #5866d6;
   color: #fff;
-  border-color: #4a3b32;
+  border-color: #5866d6;
 }
 .health .stat {
   display: grid;
@@ -386,7 +386,7 @@ body.brand {
   font-weight: 700;
 }
 .health .month span.today {
-  outline: 2px solid #4a3b32;
+  outline: 2px solid #5866d6;
 }
 .health .event {
   display: grid;
@@ -448,7 +448,7 @@ body.brand {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  background: #4a3b32;
+  background: #5866d6;
   color: #fff;
   padding: 12px 18px;
   border-radius: 999px;

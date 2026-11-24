@@ -2,8 +2,9 @@
 // the closest example. Also the template catalogue shown on the settings pages.
 // Fixed copy only, so onboarding never calls the paid AI.
 
-export const BRAND = { accent: '#E7C5A8', ink: '#4A3B32', paper: '#FAF7F2' };
-export const MONTHLY_FEE = 'NT$370';
+// The secretary look, the same as the orb page and the Aprico OA: lavender head, navy text.
+export const BRAND = { accent: '#E4E8FF', ink: '#2B2A4A', paper: '#FFFFFF', button: '#5866D6' };
+export const MONTHLY_FEE = 'NT$180';
 
 export type Example = {
   id: string;
@@ -30,7 +31,7 @@ export const EXAMPLES: Example[] = [
     keywords: ['記帳', '帳', '花', '錢', '支出', '收入', '元', '費用'],
     chat: ['午餐 120', '💰 已記帳：餐飲 120 元。本月餐飲累計 2,340 元。'],
     benefit: '聊天就是記帳：在官方帳號或朋友群組裡隨口一句，帳務就自動整理好。',
-    fee: `每月 ${MONTHLY_FEE}，一天不到 13 元，每一筆花費都幫你算清楚。`,
+    fee: `每月 ${MONTHLY_FEE}，一天只要 6 元，每一筆花費都幫你算清楚。`,
   },
   {
     id: 'todo',
@@ -182,8 +183,8 @@ export function exampleCard(ex: Example, settingsUrl: string, pagesUrl = '') {
               {
                 type: 'button',
                 style: 'primary',
-                color: BRAND.ink,
-                action: { type: 'uri', label: '設定我的 AI 秘書', uri: settingsUrl },
+                color: BRAND.button,
+                action: { type: 'uri', label: '打開秘書', uri: settingsUrl },
               },
             ],
           }
@@ -226,7 +227,7 @@ export const TUTORIAL = [
 ];
 
 /** Every secretary reply is a small branded card instead of plain text. */
-export const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/build.html?renew=1';
+export const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/member.html';
 
 /** Shown when the month's quota, the free NT$20 extra and any top-up are all used. */
 export function quotaCard(subscribeUrl: string) {
@@ -271,7 +272,7 @@ export function noticeCard(title: string, body: string, button?: CardButton) {
                 {
                   type: 'button',
                   style: 'primary',
-                  color: BRAND.ink,
+                  color: BRAND.button,
                   height: 'sm',
                   action:
                     'uri' in button
