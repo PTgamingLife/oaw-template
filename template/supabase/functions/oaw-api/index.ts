@@ -22,6 +22,8 @@ import { loadOrbs, orbAction } from '../_shared/orbs.ts';
 import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
+import { designChat, designOpen } from '../_shared/design.ts';
+import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
@@ -182,7 +184,24 @@ Deno.serve(async (req) => {
     if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle'].includes(body.action)) {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action !== 'orb_list');
-      return respond(await orbAction(body.action, body, `orb-${crypto.randomUUID()}`));
+      const out = await orbAction(body.action, body, `orb-${crypto.randomUUID()}`);
+      return respond(body.action === 'orb_list' ? { ...out, plan: (await quota()).plan ?? 'secretary' } : out);
+    }
+    if (['design_open', 'design_chat', 'design_apply'].includes(body.action)) {
+      // 領航者版 only. Drafting needs an unlocked owner; going live needs the PIN.
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, body.action === 'design_apply');
+      if ((await quota()).plan !== 'navigator') return respond({ error: 'navigator_required' }, 403);
+      if (body.action === 'design_open') return respond(await designOpen());
+      if (body.action === 'design_chat')
+        return respond(await designChat(body.request, body.config));
+      const next = validateConfig(body.config);
+      const png = decodePng(body.image);
+      await saveConfig(next);
+      const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
+      const id = await line.publishMenu(richMenu(next, PX, env('LIFF_URL')), png, `${PX}-main`);
+      await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
+      return respond({ ok: true, richMenuId: id });
     }
     if (body.action === 'cal_month' || body.action === 'cal_delete') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
@@ -268,7 +287,7 @@ Deno.serve(async (req) => {
     const status =
       code.startsWith('image_') || code.startsWith('invalid_') || code.endsWith('_invalid')
         ? 400
-        : code === 'health_forbidden' || code === 'consent_required' || code === 'owner_only'
+        : code === 'health_forbidden' || code === 'consent_required' || code === 'owner_only' || code === 'navigator_required'
           ? 403
           : code === 'owner_locked' || code === 'pin_wait'
             ? 423

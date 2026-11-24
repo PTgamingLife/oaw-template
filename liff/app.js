@@ -77,7 +77,7 @@ export function menuAreas(grid, width = 1200, height = 810) {
   });
 }
 
-function drawMenu(canvas, config, shape = config.shape ?? 0) {
+export function drawMenu(canvas, config, shape = config.shape ?? 0) {
   canvas.width = 1200;
   canvas.height = 810;
   const ctx = canvas.getContext('2d');
@@ -317,6 +317,10 @@ async function main() {
   if (params.get('view') === 'orbs') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定 AI 秘書。');
     return (await import('./orbs.js')).orbsView(h, show, call);
+  }
+  if (params.get('view') === 'design') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以使用介面設計中心。');
+    return (await import('./design.js')).designView(h, show, call, drawMenu, menuAreas);
   }
   if (params.get('view') === 'calendar') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以看行事曆。');
