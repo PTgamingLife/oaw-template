@@ -50,7 +50,7 @@ import {
 } from '../_shared/store.ts';
 
 /** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
-async function aprico(route: '' | 'design' | 'settings', body: unknown) {
+async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknown) {
   const base = env('APRICO_URL'),
     key = await apricoKey(),
     url = base && (route ? `${base}/${route}` : base);
@@ -179,6 +179,27 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
             : '還沒有連結其他帳號。到「設定我的 AI 秘書」→「跨帳號連結」建立。',
         ),
       ));
+  }
+  // 領航者版: the owner types the one-time unlock code from Aprico in this chat.
+  const unlock = event.message.text.toUpperCase().replace(/[\s-]/g, '');
+  if (owner === userId && /^(領航者)?[A-HJ-NP-Z2-9]{12}$/.test(unlock)) {
+    const { status, data } = await aprico('unlock', { code: unlock.slice(-12) });
+    const liff = env('LIFF_URL');
+    await reply(
+      data?.plan === 'navigator'
+        ? noticeCard(
+            '🧭 領航者版已解鎖',
+            '現在可以用介面設計中心修改介面、設計卡片，並把設計好的光球發給連結的秘書帳號。',
+            liff ? { label: '打開介面設計中心', uri: `${liff}?view=design` } : undefined,
+          )
+        : noticeCard(
+            '解鎖碼無效',
+            status === 423
+              ? '這個帳號目前鎖定中，請先解鎖。'
+              : '解鎖碼不正確、已使用或已過期（7 天內有效）。請向 Aprico 重新索取。',
+          ),
+    );
+    return;
   }
   const orbs = owner === userId ? await loadOrbs().catch(() => []) : [];
   // 「發到群組：…」: an announcement to a bound group, confirmed before it is sent.

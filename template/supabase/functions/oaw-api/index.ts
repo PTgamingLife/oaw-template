@@ -29,7 +29,13 @@ import {
   TUTORIAL,
 } from '../_shared/onboarding.ts';
 
-type Quota = { paid: boolean; percentLeft?: number; extraTwdLeft?: number; paidUntil?: string };
+type Quota = {
+  paid: boolean;
+  percentLeft?: number;
+  extraTwdLeft?: number;
+  paidUntil?: string;
+  plan?: 'navigator' | 'secretary';
+};
 
 /** Subscription quota from Aprico; anything other than a clear "paid" counts as unpaid. */
 async function quota(): Promise<Quota> {
@@ -45,9 +51,11 @@ async function quota(): Promise<Quota> {
       signal: AbortSignal.timeout(5000),
     });
     const q = res.ok ? await res.json() : null;
-    if (q?.paid !== true) return { paid: false };
+    const plan = q?.plan === 'navigator' ? 'navigator' : 'secretary';
+    if (q?.paid !== true) return { paid: false, plan };
     return {
       paid: true,
+      plan,
       percentLeft: Math.max(0, Math.min(100, Number(q.percentLeft) || 0)),
       extraTwdLeft: Math.max(0, Number(q.extraTwdLeft) || 0),
       paidUntil: typeof q.paidUntil === 'string' ? q.paidUntil : '',
