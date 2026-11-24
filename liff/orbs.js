@@ -180,6 +180,7 @@ export async function orbsView(h, show, call) {
     const menuBtn = h('button', { class: 'btn3d ghost small', type: 'button' }, '更新 LINE 選單');
     menuBtn.addEventListener('click', () => publishMenu(false));
     const more = h('a', { class: 'btn3d ghost small', href: '?view=secretary' }, '更多設定');
+    const openCal = h('a', { class: 'btn3d small', href: '?view=calendar' }, '📅 打開行事曆');
     const cal = h('button', { class: 'btn3d ghost small', type: 'button' }, '📅 加入 Google／iPhone 行事曆');
     cal.addEventListener('click', () => calendarSheet('ics_link'));
     stage.replaceChildren(
@@ -199,7 +200,7 @@ export async function orbsView(h, show, call) {
             h('div', { class: 'cell' }, '打開秘書'),
             state.buttons.map((w) => h('div', { class: 'cell' + (w ? '' : ' empty') }, w || '未設定')),
           ),
-          h('div', { class: 'tools' }, cal, menuBtn, more),
+          h('div', { class: 'tools' }, openCal, cal, menuBtn, more),
         ),
       ),
     );
