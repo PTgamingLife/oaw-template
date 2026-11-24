@@ -16,7 +16,7 @@ import {
   quotaCard,
 } from '../_shared/onboarding.ts';
 import { PX } from '../_shared/px.ts';
-import { healthChat } from '../_shared/health-chat.ts';
+import { healthEnabled, healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import { bindNamedGroup, groupPostback, groupPrefs, groupText, ownerGroupSend } from '../_shared/groups.ts';
@@ -248,6 +248,13 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       await reply(noticeCard('無法連接', '這個帳號已經有管理者了。'));
       return;
     }
+    if (!healthEnabled()) {
+      // 秘書版: no owner-only menu and no questionnaire. The orb page is where everything is.
+      // Drop a personal menu left from an older version so the shared four-cell menu shows.
+      await line.call(`/v2/bot/user/${userId}/richmenu`, undefined, 'DELETE').catch(() => null);
+      await reply(welcomeOwner(owner ? 'AI 秘書已重新連接。' : '你已是這個帳號的管理者，AI 秘書也啟用了。'));
+      return;
+    }
     await line.linkMenuByName(userId, `${PX}-owner`).catch(() => false);
     if (!owner) {
       await setPending(userId, { onboarding: true });
@@ -260,6 +267,10 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   }
   if (intent.kind === 'bind') {
     if (await bindOwner(userId, intent.code)) {
+      if (!healthEnabled()) {
+        await reply(welcomeOwner('已把你設定為這個帳號的管理者。'));
+        return;
+      }
       // Owner-only menu: 設定我的 AI 秘書 / 設定我的介面 (created during setup).
       await line.linkMenuByName(userId, `${PX}-owner`).catch(() => false);
       await setPending(userId, { onboarding: true });
@@ -414,6 +425,16 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     default:
       await reply(noticeCard(config.oaName || '小提醒', config.failure));
   }
+}
+
+/** 秘書版: after connecting, one card that opens the orb page. */
+function welcomeOwner(text: string) {
+  const liff = env('LIFF_URL');
+  return noticeCard(
+    '✅ 連接完成',
+    `${text}\n\n第一顆光球已經幫你開好行事曆秘書：直接跟我說行程，我就會記下來。輸入「行事曆」可以隨時查看。`,
+    liff ? { label: '打開秘書', uri: `${liff}?view=orbs` } : undefined,
+  );
 }
 
 Deno.serve(async (req) => {
