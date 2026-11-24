@@ -6,6 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { validateConfig } from '../template/supabase/functions/_shared/logic.ts';
+import { defaultOrbs, orbMenu } from '../template/supabase/functions/_shared/orb-model.ts';
 
 const DRY = process.argv.includes('--dry-run');
 const E = (name) => (process.env[name] ?? '').trim();
@@ -342,57 +343,87 @@ async function main() {
     method: 'PUT',
     body: { endpoint },
   });
-  const test = await api(LINE, '/v2/bot/channel/webhook/test', {
-    token: botToken,
-    method: 'POST',
-    body: { endpoint },
-  });
+  // A freshly deployed function can be slow on its first call: try a few times before
+  // reporting that LINE could not reach the webhook.
+  let test = {};
+  for (let i = 0; i < 3 && test.success !== true; i++) {
+    if (i) await new Promise((done) => setTimeout(done, 4000));
+    test = await api(LINE, '/v2/bot/channel/webhook/test', {
+      token: botToken,
+      method: 'POST',
+      body: { endpoint },
+    }).catch(() => ({}));
+  }
   step('webhook', {
     success: test.success === true,
     status: test.statusCode ?? null,
     reason: test.reason ?? null,
   });
 
-  // Owner-only menu: replace any previous one, then relink it if an owner is already bound.
   const { richmenus = [] } = await api(LINE, '/v2/bot/richmenu/list', { token: botToken });
-  const { richMenuId } = await api(LINE, '/v2/bot/richmenu', {
-    token: botToken,
-    method: 'POST',
-    body: ownerMenu(px, liffUrl, HEALTH),
-  });
-  const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
-    body: readFileSync(HEALTH ? 'oaw/health-menu.png' : 'oaw/owner-menu.png'),
-  });
-  if (!up.ok) throw Error(`上傳擁有者選單圖片失敗（HTTP ${up.status}）`);
-  const rows = await api(SB, `/v1/projects/${ref}/database/query`, {
-    token: sbToken,
-    method: 'POST',
-    body: { query: `select line_user_id from public.${px}_owner where id = 1` },
-  });
-  const row = Array.isArray(rows) ? rows[0] : null;
-  if (/^U[0-9a-f]{32}$/.test(row?.line_user_id ?? ''))
-    await api(LINE, `/v2/bot/user/${row.line_user_id}/richmenu/${richMenuId}`, {
+  let row = null;
+  if (HEALTH) {
+    // Health template: one menu for the elder and the family; relinked if an owner is bound.
+    const { richMenuId } = await api(LINE, '/v2/bot/richmenu', {
       token: botToken,
       method: 'POST',
+      body: ownerMenu(px, liffUrl, HEALTH),
     });
-  // Family members use the same health menu, so it is also every friend's default,
-  // unless the owner has set a default menu of their own (see takeDefault).
-  if (HEALTH) {
-    // 404 = no default yet. Any other failure: leave the owner's menu alone.
-    const current = await api(LINE, '/v2/bot/user/all/richmenu', { token: botToken }).catch((e) =>
-      /HTTP 404/.test(e.message) ? {} : { richMenuId: 'unknown' },
-    );
-    if (takeDefault(current.richMenuId, richmenus, px))
-      await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, {
+    const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
+      body: readFileSync(HEALTH ? 'oaw/health-menu.png' : 'oaw/owner-menu.png'),
+    });
+    if (!up.ok) throw Error(`上傳擁有者選單圖片失敗（HTTP ${up.status}）`);
+    const rows = await api(SB, `/v1/projects/${ref}/database/query`, {
+      token: sbToken,
+      method: 'POST',
+      body: { query: `select line_user_id from public.${px}_owner where id = 1` },
+    });
+    row = Array.isArray(rows) ? rows[0] : null;
+    if (/^U[0-9a-f]{32}$/.test(row?.line_user_id ?? ''))
+      await api(LINE, `/v2/bot/user/${row.line_user_id}/richmenu/${richMenuId}`, {
         token: botToken,
         method: 'POST',
       });
+    // Family members use the same health menu, so it is also every friend's default,
+    // unless the owner has set a default menu of their own (see takeDefault).
+    if (HEALTH) {
+      // 404 = no default yet. Any other failure: leave the owner's menu alone.
+      const current = await api(LINE, '/v2/bot/user/all/richmenu', { token: botToken }).catch((e) =>
+        /HTTP 404/.test(e.message) ? {} : { richMenuId: 'unknown' },
+      );
+      if (takeDefault(current.richMenuId, richmenus, px))
+        await api(LINE, `/v2/bot/user/all/richmenu/${richMenuId}`, {
+          token: botToken,
+          method: 'POST',
+        });
+    }
+    for (const m of richmenus)
+      if (m.name === `${px}-owner`)
+        await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
+  } else {
+    // 秘書版: everyone gets the fixed four-cell menu (打開秘書 + three orbs). It is published
+    // once; later the orb page republishes it whenever the owner changes an orb's command.
+    if (!richmenus.some((m) => m.name === `${px}-main`)) {
+      const made = await api(LINE, '/v2/bot/richmenu', {
+        token: botToken,
+        method: 'POST',
+        body: orbMenu(defaultOrbs(), px, liffUrl),
+      });
+      const up = await fetch(`https://api-data.line.me/v2/bot/richmenu/${made.richMenuId}/content`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${botToken}`, 'Content-Type': 'image/png' },
+        body: readFileSync('oaw/orb-menu.png'),
+      });
+      if (!up.ok) throw Error(`上傳選單圖片失敗（HTTP ${up.status}）`);
+      await api(LINE, `/v2/bot/user/all/richmenu/${made.richMenuId}`, { token: botToken, method: 'POST' });
+    }
+    // The old owner-only menu (設定我的 AI 秘書／介面) is gone: settings live on the orb page.
+    for (const m of richmenus)
+      if (m.name === `${px}-owner`)
+        await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
   }
-  for (const m of richmenus)
-    if (m.name === `${px}-owner`)
-      await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
   step('owner_menu', row?.line_user_id ? 'linked' : 'ready');
 
   writeFileSync(
