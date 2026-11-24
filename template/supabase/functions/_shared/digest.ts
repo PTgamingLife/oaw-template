@@ -23,20 +23,31 @@ export async function digestKey(secret: string, ymd: string) {
 }
 
 /** Rows for {px}_records; every row carries the same keys (bulk insert needs that). */
-export function digestRows(d: Digest) {
+export function digestRows(d: Digest, sourceId: string | null = null) {
   const row = (
     kind: string,
     day: string | null,
     title: string,
     time = '',
     amount: number | null = null,
-  ) => ({ kind, day, time, title, amount });
+  ) => ({ kind, day, time, title, amount, source_id: sourceId });
   return [
     ...(d.events ?? []).map((e) => row('event', e.date, e.title, e.time)),
     ...(d.expenses ?? []).map((e) => row('expense', e.date, e.note || '支出', '', e.amount)),
     ...(d.todos ?? []).map((t) => row('todo', null, t.text)),
     ...(d.life ?? []).map((l) => row('life', l.date, l.text)),
   ];
+}
+
+/** One digest from several chats (each chat is read by the AI separately). */
+export function mergeDigests(list: Digest[]): Digest {
+  return {
+    events: list.flatMap((d) => d.events ?? []),
+    expenses: list.flatMap((d) => d.expenses ?? []),
+    todos: list.flatMap((d) => d.todos ?? []),
+    life: list.flatMap((d) => d.life ?? []),
+    summary: list.find((d) => d.summary)?.summary ?? '',
+  };
 }
 
 const line = (t: string) => ({ type: 'text', text: t, wrap: true, size: 'sm' });
@@ -46,7 +57,7 @@ const section = (title: string, rows: string[]) =>
     : [];
 
 /** Summary card pushed to the owner; null when nothing was recorded. */
-export function digestCard(d: Digest, liffUrl = '') {
+export function digestCard(d: Digest, liffUrl = '', title = '🌙 今天的整理') {
   const events = (d.events ?? []).map((e) =>
     `${e.date.slice(5)} ${e.time} ${e.title}`.replace('  ', ' '),
   );
@@ -57,14 +68,14 @@ export function digestCard(d: Digest, liffUrl = '') {
   const total = (d.expenses ?? []).reduce((s, e) => s + e.amount, 0);
   return {
     type: 'flex',
-    altText: '今天的整理',
+    altText: title,
     contents: {
       type: 'bubble',
       header: {
         type: 'box',
         layout: 'vertical',
         backgroundColor: BRAND.accent,
-        contents: [{ type: 'text', text: '🌙 今天的整理', weight: 'bold', color: BRAND.ink }],
+        contents: [{ type: 'text', text: title, weight: 'bold', color: BRAND.ink }],
       },
       body: {
         type: 'box',

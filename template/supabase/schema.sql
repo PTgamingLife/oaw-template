@@ -39,6 +39,76 @@ alter table public.__px___link_inbox enable row level security;
 revoke all on public.__px___link_inbox from public, anon, authenticated;
 grant select, insert, update, delete on public.__px___link_inbox to service_role;
 
+-- 光球: slots 1–3 are the owner's orbs, 4 is a hidden orb received from a 領航者 account.
+create table if not exists public.__px___orbs (
+  slot int primary key check (slot between 1 and 4),
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.__px___orbs enable row level security;
+revoke all on public.__px___orbs from public, anon, authenticated;
+grant select, insert, update, delete on public.__px___orbs to service_role;
+
+-- Timed jobs (定時推播 / 提醒 / 統計截止 / 每晚整理) run from this database: pg_cron calls
+-- __px___tick, which makes a one-use token and posts it to this app's {px}-digest function.
+do $$ begin
+  create extension if not exists pg_cron;
+  create extension if not exists pg_net;
+exception when others then
+  raise notice 'oaw: timed jobs unavailable (%). Orbs still work; scheduled pieces will not fire.', sqlerrm;
+end $$;
+
+create table if not exists public.__px___ticks (
+  token_hash text primary key,
+  job text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+alter table public.__px___ticks enable row level security;
+revoke all on public.__px___ticks from public, anon, authenticated;
+grant select, delete on public.__px___ticks to service_role;
+
+create or replace function public.__px___tick(job text, url text)
+returns bigint language plpgsql security definer set search_path = '' as $$
+declare k text; request bigint;
+begin
+  delete from public.__px___ticks where created_at < now() - interval '1 day';
+  k := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+  insert into public.__px___ticks (token_hash, job, expires_at)
+    values (encode(sha256(convert_to(k, 'UTF8')), 'hex'), job, now() + interval '120 seconds');
+  select net.http_post(
+    url := url,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-oaw-tick', k),
+    body := jsonb_build_object('job', job), timeout_milliseconds := 120000) into request;
+  return request;
+end;
+$$;
+revoke all on function public.__px___tick(text, text) from public, anon, authenticated;
+
+-- Replace this app's cron jobs with the given list. Only daily "m h * * *" entries that call
+-- this app's own function are accepted.
+create or replace function public.__px___cron_sync(jobs jsonb, url text)
+returns int language plpgsql security definer set search_path = '' as $$
+declare j jsonb; n int := 0;
+begin
+  if url !~ '^https://[a-z0-9]{20}\.supabase\.co/functions/v1/__px__-digest$' then
+    raise exception 'bad url';
+  end if;
+  perform cron.unschedule(jobid) from cron.job where jobname like '__px__-orb-%';
+  for j in select * from jsonb_array_elements(jobs) loop
+    if (j->>'name') !~ '^[a-z0-9-]{1,40}$' or (j->>'cron') !~ '^[0-5]?[0-9] ([01]?[0-9]|2[0-3]) \* \* \*$' then
+      raise exception 'bad job';
+    end if;
+    perform cron.schedule('__px__-orb-' || (j->>'name'), j->>'cron',
+      format('select public.__px___tick(%L, %L)', j->>'name', url));
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+revoke all on function public.__px___cron_sync(jsonb, text) from public, anon, authenticated;
+grant execute on function public.__px___cron_sync(jsonb, text) to service_role;
+
 create table if not exists public.__px___members (
   line_user_id text primary key,
   member_no bigint generated always as identity unique,
@@ -87,6 +157,17 @@ create table if not exists public.__px___records (
   amount integer,
   created_at timestamptz not null default now()
 );
+-- Groups: LINE group name (owner can rename), and which chat each record came from.
+alter table public.__px___groups add column if not exists name text not null default '';
+alter table public.__px___records add column if not exists source_id text;
+create index if not exists __px___records_source on public.__px___records (source_id, kind, day);
+-- Who said each line (LINE user id), for 統計.
+alter table public.__px___messages add column if not exists sender text;
+create index if not exists __px___messages_source on public.__px___messages (source_id, sent_at);
+-- Group AI: call word, AI calls per group per day, owner announcements per day.
+alter table public.__px___owner add column if not exists group_wake text not null default '小秘';
+alter table public.__px___owner add column if not exists group_daily int not null default 30;
+alter table public.__px___owner add column if not exists group_send_daily int not null default 20;
 
 alter table public.__px___groups enable row level security;
 alter table public.__px___messages enable row level security;

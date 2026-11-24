@@ -262,6 +262,19 @@ async function settingsView(view) {
       ? h(
           'section',
           { class: 'card' },
+          h('h3', {}, '✨ 我的 AI 秘書'),
+          h(
+            'p',
+            { class: 'muted' },
+            '三顆光球，每顆管一個對話（個人或群組）。放上拼圖，設定要記錄、整理、提醒或統計什麼。',
+          ),
+          h('a', { class: 'btn primary', href: '?view=orbs' }, '打開光球設定'),
+        )
+      : null,
+    data.view === 'secretary'
+      ? h(
+          'section',
+          { class: 'card' },
           h('h3', {}, '🔗 跨帳號連結'),
           h(
             'p',
@@ -269,6 +282,19 @@ async function settingsView(view) {
             '和其他官方帳號（例如其他部門）互傳指定資訊，雙方都同意才會連結。',
           ),
           h('a', { class: 'btn', href: '?view=links' }, '管理連結'),
+        )
+      : null,
+    data.view === 'secretary'
+      ? h(
+          'section',
+          { class: 'card' },
+          h('h3', {}, '👥 我的群組'),
+          h(
+            'p',
+            { class: 'muted' },
+            '群組裡叫 AI 整理、查行程、記事；在一對一聊天輸入「發到群組：內容」發公告。',
+          ),
+          h('a', { class: 'btn', href: '?view=groups' }, '管理群組'),
         )
       : null,
     data.view === 'secretary' ? await securitySection(h, call) : null,
@@ -287,6 +313,14 @@ async function main() {
   if (params.get('view') === 'links') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定跨帳號連結。');
     return (await import('./links.js')).linksView(h, show, call);
+  }
+  if (params.get('view') === 'orbs') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以設定 AI 秘書。');
+    return (await import('./orbs.js')).orbsView(h, show, call);
+  }
+  if (params.get('view') === 'groups') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以設定群組。');
+    return (await import('./groups.js')).groupsView(h, show, call);
   }
   if (params.get('view') === 'confirm') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以套用設定。');

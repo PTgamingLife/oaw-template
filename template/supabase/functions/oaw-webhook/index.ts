@@ -19,6 +19,11 @@ import { PX } from '../_shared/px.ts';
 import { healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
+import { bindNamedGroup, groupPostback, groupPrefs, groupText, ownerGroupSend } from '../_shared/groups.ts';
+import { groupHelp } from '../_shared/group-intent.ts';
+import { loadOrbs } from '../_shared/orbs.ts';
+import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
+import { orbText } from '../_shared/orb-run.ts';
 import {
   listLinks,
   saveReceived,
@@ -29,7 +34,6 @@ import {
 } from '../_shared/links.ts';
 import {
   apricoKey,
-  bindGroup,
   bindOwner,
   connectOwner,
   groupBound,
@@ -46,7 +50,7 @@ import {
 } from '../_shared/store.ts';
 
 /** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
-async function aprico(route: '' | 'design' | 'settings', body: unknown) {
+async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknown) {
   const base = env('APRICO_URL'),
     key = await apricoKey(),
     url = base && (route ? `${base}/${route}` : base);
@@ -61,7 +65,10 @@ async function aprico(route: '' | 'design' | 'settings', body: unknown) {
 
 const RECORDED = '晚上 9 點會幫你整理成行程、帳務和待辦。';
 
-/** Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly digest. */
+/**
+ * Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly
+ * digest, and anyone there can call the AI with the call word (groups.ts).
+ */
 async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
   if (event.type !== 'message' || event.message?.type !== 'text') return;
   const groupId: string = event.source.groupId ?? event.source.roomId ?? '';
@@ -70,16 +77,23 @@ async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
   const owner = await ownerId();
   if (event.message.text.trim() === '綁定群組') {
     if (!owner || userId !== owner) return;
-    await bindGroup(groupId);
+    await bindNamedGroup(line, event.source);
     await line.reply(event.replyToken, [
       noticeCard(
         '📝 開始記錄這個群組',
-        '這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給你。',
+        '這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給管理者。\n\n' +
+          groupHelp((await groupPrefs()).wake),
       ),
     ]);
     return;
   }
-  if (await groupBound(groupId)) await saveMessage(groupId, userId === owner, event.message.text);
+  if (!(await groupBound(groupId))) return;
+  const orbs = await loadOrbs().catch(() => []);
+  const orb = orbFor(orbs, groupId);
+  if (orb) return void (await orbText(event, line, owner, orb, groupId));
+  // An orb is set to this group but switched off: nothing runs and nothing is kept.
+  if (orbClaims(orbs, groupId)) return;
+  await groupText(event, line, owner);
 }
 
 async function handle(event: any, line: ReturnType<typeof lineClient>) {
@@ -122,6 +136,11 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         return void (await reply(noticeCard('沒有送出', sendErrorText((e as Error).message))));
       }
     }
+    if (
+      ownerNow === userId &&
+      (await groupPostback(data, userId, reply, line, String(event.webhookEventId ?? '')))
+    )
+      return;
     const saveId = data.match(/^link-save:([0-9a-f-]{36})$/)?.[1];
     if (ownerNow === userId && saveId) {
       const ok = await saveReceived(saveId, userId);
@@ -161,6 +180,45 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         ),
       ));
   }
+  // 領航者版: the owner types the one-time unlock code from Aprico in this chat.
+  const unlock = event.message.text.toUpperCase().replace(/[\s-]/g, '');
+  if (owner === userId && /^(領航者)?[A-HJ-NP-Z2-9]{12}$/.test(unlock)) {
+    const { status, data } = await aprico('unlock', { code: unlock.slice(-12) });
+    const liff = env('LIFF_URL');
+    await reply(
+      data?.plan === 'navigator'
+        ? noticeCard(
+            '🧭 領航者版已解鎖',
+            '現在可以用介面設計中心修改介面、設計卡片，並把設計好的光球發給連結的秘書帳號。',
+            liff ? { label: '打開介面設計中心', uri: `${liff}?view=design` } : undefined,
+          )
+        : noticeCard(
+            '解鎖碼無效',
+            status === 423
+              ? '這個帳號目前鎖定中，請先解鎖。'
+              : '解鎖碼不正確、已使用或已過期（7 天內有效）。請向 Aprico 重新索取。',
+          ),
+    );
+    return;
+  }
+  const orbs = owner === userId ? await loadOrbs().catch(() => []) : [];
+  // 「發到群組：…」: an announcement to a bound group, confirmed before it is sent.
+  if (
+    owner === userId &&
+    /^發到/.test(event.message.text.trim()) &&
+    (await ownerGroupSend(
+      event.message.text,
+      userId,
+      reply,
+      line,
+      String(event.webhookEventId ?? ''),
+      (g) => (orbClaims(orbs, g) ? Boolean(pieceOf(orbFor(orbs, g), 'announce')) : true),
+    ))
+  )
+    return;
+  // The owner's own orb: its 指令 word and 回答 call word are answered before anything else.
+  const mine = orbFor(orbs, 'me');
+  if (mine && (await orbText(event, line, owner, mine, userId))) return;
   const health = await healthChat(event, userId, owner, line);
   if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);
@@ -312,7 +370,19 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           );
           return;
         }
-        await saveMessage(userId, true, event.message.text);
+        // With orbs, the 1:1 chat is only recorded by a lit orb that has a 「紀錄」 piece.
+        if (orbClaims(orbs, 'me') && !pieceOf(mine, 'record')) {
+          const liff = env('LIFF_URL');
+          await reply(
+            noticeCard(
+              '這則沒有記下',
+              mine ? '個人對話的光球沒有「紀錄」拼圖。' : '個人對話的光球目前是關閉的。',
+              liff ? { label: '打開我的 AI 秘書', uri: `${liff}?view=orbs` } : undefined,
+            ),
+          );
+          return;
+        }
+        await saveMessage(userId, true, event.message.text, userId);
         await reply(noticeCard('📝 已記下', RECORDED));
         return;
       }

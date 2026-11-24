@@ -17,6 +17,8 @@ import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
 import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
+import { groupAction } from '../_shared/groups.ts';
+import { orbAction } from '../_shared/orbs.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
@@ -27,7 +29,13 @@ import {
   TUTORIAL,
 } from '../_shared/onboarding.ts';
 
-type Quota = { paid: boolean; percentLeft?: number; extraTwdLeft?: number; paidUntil?: string };
+type Quota = {
+  paid: boolean;
+  percentLeft?: number;
+  extraTwdLeft?: number;
+  paidUntil?: string;
+  plan?: 'navigator' | 'secretary';
+};
 
 /** Subscription quota from Aprico; anything other than a clear "paid" counts as unpaid. */
 async function quota(): Promise<Quota> {
@@ -43,9 +51,11 @@ async function quota(): Promise<Quota> {
       signal: AbortSignal.timeout(5000),
     });
     const q = res.ok ? await res.json() : null;
-    if (q?.paid !== true) return { paid: false };
+    const plan = q?.plan === 'navigator' ? 'navigator' : 'secretary';
+    if (q?.paid !== true) return { paid: false, plan };
     return {
       paid: true,
+      plan,
       percentLeft: Math.max(0, Math.min(100, Number(q.percentLeft) || 0)),
       extraTwdLeft: Math.max(0, Number(q.extraTwdLeft) || 0),
       paidUntil: typeof q.paidUntil === 'string' ? q.paidUntil : '',
@@ -144,6 +154,16 @@ Deno.serve(async (req) => {
         return respond(await aprLink('scope', { linkId: body.linkId, scope: body.scope }));
       if (body.action === 'link_revoke')
         return respond(await aprLink('revoke', { linkId: body.linkId }));
+    }
+    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle'].includes(body.action)) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, body.action !== 'orb_list');
+      return respond(await orbAction(body.action, body, `orb-${crypto.randomUUID()}`));
+    }
+    if (['group_list', 'group_save', 'group_unbind'].includes(body.action)) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, body.action !== 'group_list');
+      return respond(await groupAction(body.action, body));
     }
     if (body.action === 'pending_peek' || body.action === 'pending_apply') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

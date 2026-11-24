@@ -139,9 +139,29 @@ export async function onceToday(key: string) {
   return true;
 }
 
+/**
+ * Count one use of `key` today (Taipei). Returns how many are left after this one, or -1
+ * when `max` was already reached (nothing is counted then).
+ */
+export async function countToday(key: string, max: number) {
+  const id = `count:${key}`,
+    day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const { data } = await db
+    .from(T('pending'))
+    .select('proposal')
+    .eq('line_user_id', id)
+    .maybeSingle();
+  const used = data?.proposal?.day === day ? Number(data.proposal.n) || 0 : 0;
+  if (used >= max) return -1;
+  await db
+    .from(T('pending'))
+    .upsert({ line_user_id: id, proposal: { day, n: used + 1 }, created_at: new Date().toISOString() });
+  return max - used - 1;
+}
+
 // ---- Chat auto-record ----
-export async function bindGroup(groupId: string) {
-  await db.from(T('groups')).upsert({ group_id: groupId });
+export async function bindGroup(groupId: string, name = '') {
+  await db.from(T('groups')).upsert({ group_id: groupId, name: name.slice(0, 40) });
 }
 
 export async function groupBound(groupId: string) {
@@ -153,20 +173,31 @@ export async function groupBound(groupId: string) {
   return Boolean(data);
 }
 
-export async function saveMessage(sourceId: string, isOwner: boolean, text: string) {
+export async function saveMessage(sourceId: string, isOwner: boolean, text: string, sender = '') {
   await db
     .from(T('messages'))
-    .insert({ source_id: sourceId, is_owner: isOwner, text: text.slice(0, 500) });
+    .insert({ source_id: sourceId, is_owner: isOwner, text: text.slice(0, 500), sender: sender || null });
 }
 
-/** Unprocessed lines, oldest first, capped so one digest stays within the AI input limit. */
-export async function pendingMessages(maxBytes = 9000) {
+/** Chats (groups, the owner's own notes) that have unprocessed lines. */
+export async function pendingSources() {
   const { data } = await db
     .from(T('messages'))
-    .select('id,is_owner,text,sent_at')
+    .select('source_id')
     .is('processed_at', null)
     .order('sent_at', { ascending: true })
-    .limit(300);
+    .limit(1000);
+  return [...new Set((data ?? []).map((m: { source_id: string }) => m.source_id))];
+}
+
+/** Unprocessed lines of one chat, oldest first, capped to stay within the AI input limit. */
+export async function pendingMessages(maxBytes = 9000, sourceId?: string) {
+  let q = db
+    .from(T('messages'))
+    .select('id,is_owner,text,sent_at')
+    .is('processed_at', null);
+  if (sourceId) q = q.eq('source_id', sourceId);
+  const { data } = await q.order('sent_at', { ascending: true }).limit(300);
   const out = [];
   let bytes = 0;
   for (const m of data ?? []) {
