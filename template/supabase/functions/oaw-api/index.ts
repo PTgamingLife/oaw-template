@@ -18,7 +18,10 @@ import { healthAction } from '../_shared/health-api.ts';
 import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
 import { groupAction } from '../_shared/groups.ts';
-import { orbAction } from '../_shared/orbs.ts';
+import { loadOrbs, orbAction } from '../_shared/orbs.ts';
+import { orbMenu } from '../_shared/orb-model.ts';
+import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
+import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
   DEFAULT_SUBSCRIBE_URL,
@@ -79,7 +82,7 @@ function cors(req: Request) {
   };
 }
 
-function decodePng(b64: unknown) {
+function decodePng(b64: unknown, height = 810) {
   if (typeof b64 !== 'string' || b64.length > (MAX_IMAGE * 4) / 3 + 4) throw Error('image_invalid');
   const bin = atob(b64);
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
@@ -88,7 +91,7 @@ function decodePng(b64: unknown) {
     throw Error('image_invalid');
   // PNG IHDR width/height must match the menu size.
   const view = new DataView(bytes.buffer);
-  if (view.getUint32(16) !== 1200 || view.getUint32(20) !== 810) throw Error('image_size_invalid');
+  if (view.getUint32(16) !== 1200 || view.getUint32(20) !== height) throw Error('image_size_invalid');
   return bytes;
 }
 
@@ -96,6 +99,26 @@ Deno.serve(async (req) => {
   const headers = cors(req);
   const respond = (data: unknown, status = 200) => Response.json(data, { status, headers });
   if (req.method === 'OPTIONS') return new Response(null, { headers });
+  // Calendar subscription: GET ?ics=<token>. The token is the only key, so the feed holds
+  // event titles and times only, and the owner can replace the token at any time.
+  if (req.method === 'GET') {
+    const given = new URL(req.url).searchParams.get('ics') ?? '';
+    const { data: o } = await db.from(T('owner')).select('ics_token').eq('id', 1).maybeSingle();
+    if (!/^[0-9a-f]{48}$/.test(given) || !sameToken(given, o?.ics_token ?? ''))
+      return new Response('not found', { status: 404 });
+    const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const { data } = await db
+      .from(T('records'))
+      .select('id,day,time,title')
+      .eq('kind', 'event')
+      .gte('day', since)
+      .order('day', { ascending: true })
+      .limit(500);
+    const config = await loadConfig().catch(() => null);
+    return new Response(buildIcs(data ?? [], `${config?.oaName ?? ''} AI 秘書`.trim(), PX), {
+      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Cache-Control': 'private, max-age=900' },
+    });
+  }
   if (req.method !== 'POST') return respond({ error: 'not_found' }, 404);
   let body: any;
   try {
@@ -159,6 +182,28 @@ Deno.serve(async (req) => {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action !== 'orb_list');
       return respond(await orbAction(body.action, body, `orb-${crypto.randomUUID()}`));
+    }
+    if (body.action === 'orb_menu_publish') {
+      // Secretary edition: the fixed four-cell menu, drawn by the orb page, for every friend.
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, true);
+      const png = decodePng(body.image, 405);
+      const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
+      const id = await line.publishMenu(orbMenu(await loadOrbs(), PX, env('LIFF_URL')), png, `${PX}-main`);
+      // The owner sees the same menu as everyone; settings are reached from the orb page.
+      await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
+      return respond({ ok: true, richMenuId: id });
+    }
+    if (body.action === 'ics_link' || body.action === 'ics_reset') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, true);
+      const { data: o } = await db.from(T('owner')).select('ics_token').eq('id', 1).maybeSingle();
+      let token: string = o?.ics_token ?? '';
+      if (!token || body.action === 'ics_reset') {
+        token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+        await db.from(T('owner')).update({ ics_token: token }).eq('id', 1);
+      }
+      return respond(icsLinks(`${Deno.env.get('SUPABASE_URL')}/functions/v1/${PX}-api?ics=${token}`));
     }
     if (['group_list', 'group_save', 'group_unbind'].includes(body.action)) {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

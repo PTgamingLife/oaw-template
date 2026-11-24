@@ -164,6 +164,8 @@ create index if not exists __px___records_source on public.__px___records (sourc
 -- Who said each line (LINE user id), for 統計.
 alter table public.__px___messages add column if not exists sender text;
 create index if not exists __px___messages_source on public.__px___messages (source_id, sent_at);
+-- Calendar subscription: a random token in the feed address (changing it cuts old links off).
+alter table public.__px___owner add column if not exists ics_token text;
 -- Group AI: call word, AI calls per group per day, owner announcements per day.
 alter table public.__px___owner add column if not exists group_wake text not null default '小秘';
 alter table public.__px___owner add column if not exists group_daily int not null default 30;
