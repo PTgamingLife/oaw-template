@@ -179,9 +179,10 @@ async function supabaseProject(token, px, previous) {
   const known = E('OAW_SB_REF') || previous;
   if (known) return known;
   const orgs = await api(SB, '/v1/organizations', { token }).catch((e) => {
+    // Keep Supabase's own reason: without it nobody can tell an expired token from a limited one.
     if (/HTTP 40[13]/.test(e.message))
       throw Error(
-        'Supabase Token 不能用：可能複製不完整、已過期或被刪除，或是有權限限制的 Token。請到 Supabase 的 Access Tokens 重新產生一組再試一次',
+        `Supabase Token 不能用（${e.message.replace(/^.*→ /, '')}）：請到 Supabase 的 Access Tokens 重新產生一組再試一次`,
       );
     throw e;
   });
