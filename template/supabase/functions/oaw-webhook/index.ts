@@ -117,7 +117,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     await reply(
       noticeCard(
         '🔒 此帳號已鎖定',
-        '管理功能已暫停。如果是你本人鎖定的，請到 Aprico 建置中心用 GitHub 驗證後解鎖。',
+        '管理功能已暫停。如果是你本人鎖定的，請到 Aprico 會員中心的「帳號安全」用 GitHub 驗證後解鎖。',
       ),
     );
     return;
@@ -177,7 +177,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           `找不到「${want.asked}」`,
           want.names?.length
             ? `目前連結的帳號：${want.names.join('、')}`
-            : '還沒有連結其他帳號。到「設定我的 AI 秘書」→「跨帳號連結」建立。',
+            : '還沒有連結其他帳號。到「打開秘書」→「更多設定」→「跨帳號連結」建立。',
         ),
       ));
   }

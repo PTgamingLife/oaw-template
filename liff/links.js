@@ -107,7 +107,7 @@ export async function linksView(h, show, call) {
   create.addEventListener('click', async () => {
     try {
       const r = await call('link_create', { label: myLabel.value });
-      const text = `請在你的官方帳號打開「設定我的 AI 秘書」→「跨帳號連結」，輸入連結碼：${r.code}（10 分鐘內有效）`;
+      const text = `請在你的官方帳號打開秘書 →「更多設定」→「跨帳號連結」，輸入連結碼：${r.code}（10 分鐘內有效）`;
       const share = h('button', { class: 'btn brand', type: 'button' }, '分享給對方');
       share.addEventListener('click', async () => {
         try {

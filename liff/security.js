@@ -5,7 +5,7 @@ const MESSAGES = {
   pin_wrong: 'PIN 不正確，請再試一次。',
   pin_wait: '錯誤次數太多，請 15 分鐘後再試。',
   pin_invalid: 'PIN 需要 6 位數字，且不能是 123456、111111 這類太簡單的組合。',
-  owner_locked: '此帳號已鎖定。請到 Aprico 建置中心用 GitHub 驗證後解鎖。',
+  owner_locked: '此帳號已鎖定。請到 Aprico 會員中心的「帳號安全」用 GitHub 驗證後解鎖。',
   lock_unknown: '目前無法確認帳號狀態，請稍後再試。',
 };
 export const securityMessage = (code) => MESSAGES[code] ?? `操作失敗（${code}）`;
