@@ -14,6 +14,8 @@ const TYPES = {
   answer: ['回答', '例如：有人叫「小秘」就依最近的對話回答'],
 };
 const MOODS = ['m-hop', 'm-tilt', 'm-spin', 'm-pop', 'm-proud', 'm-shy', 'm-sleep', 'm-step'];
+// Moods that already have a generated expression clip (the rest are added as they are made).
+const CLIPS = { 'm-hop': { src: 'assets/moods/happy.webp', ms: 4050 } };
 const errorText = (code) =>
   ({
     pin_cancelled: '',
@@ -170,10 +172,29 @@ export async function orbsView(h, show, call) {
         orbBox.append(b);
       });
     const img = h('img', { alt: 'AI 秘書', src: 'assets/secretary.png' });
+    // Expression clips (transparent animated WebP) play over the still picture; moods that
+    // have no clip yet use a small CSS move instead.
+    const clip = h('img', { class: 'clip', alt: '', hidden: '' });
+    let clipTimer = 0;
     const mood = () => {
+      const pick = MOODS[Math.floor(Math.random() * MOODS.length)];
+      clearTimeout(clipTimer);
       img.className = '';
+      if (CLIPS[pick] && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        clip.src = ''; // setting the source again restarts the animation from its first frame
+        clip.src = CLIPS[pick].src;
+        clip.hidden = false;
+        img.style.visibility = 'hidden';
+        clipTimer = setTimeout(() => {
+          clip.hidden = true;
+          img.style.visibility = '';
+        }, CLIPS[pick].ms);
+        return;
+      }
+      clip.hidden = true;
+      img.style.visibility = '';
       void img.offsetWidth;
-      img.className = MOODS[Math.floor(Math.random() * MOODS.length)];
+      img.className = pick;
     };
     moodTimer = setInterval(mood, 4200);
     img.addEventListener('click', mood);
@@ -189,7 +210,7 @@ export async function orbsView(h, show, call) {
         { class: 'view' },
         h('h1', {}, '我的 AI 秘書'),
         h('p', { class: 'sub' }, '點光球設定功能，長按可以開啟或關閉。'),
-        h('div', { class: 'sky' }, orbBox, h('div', { class: 'mascot' }, img)),
+        h('div', { class: 'sky' }, orbBox, h('div', { class: 'mascot' }, img, clip)),
         h(
           'div',
           { class: 'menu' },
