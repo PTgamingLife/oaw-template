@@ -14,14 +14,29 @@ export const db = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
+/** Pictures uploaded in the 介面設計中心 live in this OA app's own public storage bucket. */
+export const IMAGE_BUCKET = `${PX}-design`;
+export const IMAGE_BASE = `${Deno.env.get('SUPABASE_URL') ?? ''}/storage/v1/object/public/${IMAGE_BUCKET}/`;
+
 export async function loadConfig(): Promise<Config> {
   const { data, error } = await db.from(T('config')).select('data').eq('id', 1).single();
   if (error || !data) throw Error('config_missing');
   return validateConfig(data.data);
 }
 
-export async function saveConfig(config: Config) {
-  const clean = validateConfig(config);
+/**
+ * Save the settings. Only the 介面設計中心 (`design`) may change the card look and pictures;
+ * every other path (chat edits, the settings page) keeps them as they are.
+ */
+export async function saveConfig(config: Config, design = false) {
+  let clean = validateConfig(config);
+  const now = design ? null : await loadConfig().catch(() => null);
+  if (now)
+    clean = {
+      ...clean,
+      card: now.card,
+      cells: clean.cells.map((c, i) => ({ ...c, img: now.cells[i].img })),
+    };
   const { error } = await db
     .from(T('config'))
     .update({ data: clean, updated_at: new Date().toISOString() })

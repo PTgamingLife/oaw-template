@@ -108,6 +108,7 @@ test('rich menu maps actions; LIFF url only for full cells', () => {
 test('public config exposes only menu data', () => {
   const pub = publicConfig(config);
   assert.deepEqual(Object.keys(pub).sort(), [
+    'card',
     'cells',
     'colors',
     'grid',

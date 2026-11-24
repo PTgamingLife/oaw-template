@@ -77,24 +77,31 @@ export function menuAreas(grid, width = 1200, height = 810) {
   });
 }
 
-function drawMenu(canvas, config, shape = config.shape ?? 0) {
+export function drawMenu(canvas, config, shape = config.shape ?? 0) {
   canvas.width = 1200;
   canvas.height = 810;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fffef9';
   ctx.fillRect(0, 0, 1200, 810);
   const areas = menuAreas(config.grid);
-  paintCells(ctx, areas, config.grid, shape, (a) => config.colors[a.index % 4], 1200, 810);
+  // config.fills (介面設計中心): a picture pattern per cell, used instead of the theme colour.
+  const fill = (a) => config.fills?.[a.index] ?? config.colors[a.index % 4];
+  paintCells(ctx, areas, config.grid, shape, fill, 1200, 810);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.font = 'bold 44px "PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
   for (const a of areas) {
+    const label = (config.cells[a.index].label || `功能 ${a.index + 1}`).slice(0, 8);
+    if (config.fills?.[a.index]) {
+      // On a picture the label sits on a light plate so it stays readable.
+      const w = Math.min(a.w - 40, ctx.measureText(label).width + 56);
+      ctx.fillStyle = 'rgba(255,255,255,.86)';
+      ctx.beginPath();
+      ctx.roundRect(a.x + (a.w - w) / 2, a.y + a.h / 2 - 40, w, 80, 40);
+      ctx.fill();
+    }
     ctx.fillStyle = '#2b2b2b';
-    ctx.font = 'bold 44px "PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
-    ctx.fillText(
-      (config.cells[a.index].label || `功能 ${a.index + 1}`).slice(0, 8),
-      a.x + a.w / 2,
-      a.y + a.h / 2,
-    );
+    ctx.fillText(label, a.x + a.w / 2, a.y + a.h / 2);
   }
 }
 
@@ -317,6 +324,10 @@ async function main() {
   if (params.get('view') === 'orbs') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定 AI 秘書。');
     return (await import('./orbs.js')).orbsView(h, show, call);
+  }
+  if (params.get('view') === 'design') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以使用介面設計中心。');
+    return (await import('./design.js')).designView(h, show, call, drawMenu, menuAreas);
   }
   if (params.get('view') === 'calendar') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以看行事曆。');
