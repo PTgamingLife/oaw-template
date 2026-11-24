@@ -90,22 +90,22 @@ async function compose(mode: 'polish' | 'write' | 'ask', requestId: string, extr
   return { status: res?.status ?? 503, text: typeof data?.text === 'string' ? data.text : '' };
 }
 
-async function aprDigest(requestId: string, messages: unknown[]) {
+export async function aprDigest(requestId: string, messages: unknown[], focus = '') {
   const base = env('APRICO_URL'),
     key = await apricoKey();
   if (!base || !key) return { status: 503, digest: null };
   const res = await fetch(`${base}/digest`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requestId, messages }),
+    body: JSON.stringify({ requestId, messages, ...(focus ? { focus } : {}) }),
     signal: AbortSignal.timeout(60000),
   }).catch(() => null);
   return { status: res?.status ?? 503, digest: res?.ok ? await res.json().catch(() => null) : null };
 }
 
-const fmt = (iso: string) =>
+export const fmt = (iso: string) =>
   new Date(iso).toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }).slice(0, 16);
-const eventLine = (e: { day: string; time: string; title: string }) =>
+export const eventLine = (e: { day: string; time: string; title: string }) =>
   `${e.day.slice(5)} ${e.time} ${e.title}`.replace('  ', ' ');
 
 /** Bind a group (owner only), keeping LINE's group name for the owner's list. */
@@ -126,17 +126,50 @@ async function memberCount(line: Line, groupId: string) {
 }
 
 /**
- * A text line in a bound group. Lines that call the AI are answered here and not kept for
- * the digest; every other line is kept as before. Received text is data, never a command
- * for anything but these four read/record actions.
+ * A text line in a bound group that no orb is set to (the behaviour before orbs): lines that
+ * call the AI are answered, every other line is kept for the nightly digest.
  */
 export async function groupText(event: any, line: Line, owner: string) {
   const groupId: string = event.source.groupId ?? event.source.roomId;
   const userId: string = event.source.userId ?? '';
-  const text: string = event.message.text;
   const prefs = await groupPrefs();
-  const cmd = groupCommand(text, prefs.wake);
-  if (!cmd) return void (await saveMessage(groupId, userId === owner, text));
+  if (!(await callWord(event, line, owner, groupId, prefs.wake, prefs.daily)))
+    await saveMessage(groupId, userId === owner, event.message.text, userId);
+}
+
+/**
+ * 「小秘 整理／行程／記下：…／問題」 in one conversation (`sourceId` = group id, or the owner's
+ * user id for the 1:1 chat). Returns false when the line does not start with the call word.
+ * Received text is data, never a command for anything but these read/record actions.
+ */
+export async function callWord(
+  event: any,
+  line: Line,
+  owner: string,
+  sourceId: string,
+  wake: string,
+  daily: number,
+  focus = '',
+) {
+  const groupId = sourceId;
+  const userId: string = event.source.userId ?? '';
+  const prefs = { wake, daily };
+  const cmd = groupCommand(event.message.text, wake);
+  if (!cmd) return false;
+  await runCall(cmd, event, line, owner, groupId, userId, prefs, focus);
+  return true;
+}
+
+async function runCall(
+  cmd: NonNullable<ReturnType<typeof groupCommand>>,
+  event: any,
+  line: Line,
+  owner: string,
+  groupId: string,
+  userId: string,
+  prefs: { wake: string; daily: number },
+  focus: string,
+) {
   const reply = (...m: unknown[]) => line.reply(event.replyToken, m);
   const title = `🤖 ${prefs.wake}`;
   if (cmd.kind === 'help') return void (await reply(noticeCard(title, groupHelp(prefs.wake))));
@@ -145,18 +178,18 @@ export async function groupText(event: any, line: Line, owner: string) {
     return void (await reply(
       noticeCard(
         '📅 接下來 7 天',
-        events.length ? events.map(eventLine).join('\n') : '這個群組接下來 7 天沒有行程。',
+        events.length ? events.map(eventLine).join('\n') : '接下來 7 天沒有行程。',
       ),
     ));
   }
   if ((await countToday(`grp:${groupId}`, prefs.daily)) < 0)
-    return void (await reply(noticeCard(title, `今天在這個群組已經叫了 ${prefs.daily} 次，明天再找我喔。`)));
+    return void (await reply(noticeCard(title, `今天在這裡已經叫了 ${prefs.daily} 次，明天再找我喔。`)));
   const quotaOut = async () => {
     await reply(noticeCard(title, '本月 AI 額度已用完，暫時無法處理。'));
     if (owner && (await onceToday('quota')))
       await line
         .push(owner, [
-          noticeCard('額度提醒', '本月 AI 額度已用完，群組裡的 AI 功能暫停。'),
+          noticeCard('額度提醒', '本月 AI 額度已用完，AI 功能暫停。'),
           quotaCard(env('APRICO_SUBSCRIBE_URL')),
         ])
         .catch(() => {});
@@ -169,16 +202,17 @@ export async function groupText(event: any, line: Line, owner: string) {
         ? await pendingMessages(9000, groupId)
         : [{ id: 0, is_owner: userId === owner, text: cmd.text, sent_at: new Date().toISOString() }];
     if (!msgs.length)
-      return void (await reply(noticeCard('🧾 群組整理', '目前沒有新的對話需要整理。')));
+      return void (await reply(noticeCard('🧾 整理', '目前沒有新的對話需要整理。')));
     const { status, digest } = await aprDigest(
       `${cmd.kind}-${rid}`,
       msgs.map((m) => ({ at: fmt(m.sent_at), who: m.is_owner ? 'owner' : 'friend', text: m.text })),
+      focus,
     );
     if (status === 402) return void (await quotaOut());
     if (!digest) return void (await reply(noticeCard(title, '暫時無法處理，請稍後再試。')));
     await saveRecords(digestRows(digest, groupId));
     if (cmd.kind === 'digest') await markProcessed(msgs.map((m) => m.id));
-    const card = digestCard(digest, '', cmd.kind === 'digest' ? '🧾 群組整理' : '📝 已記下');
+    const card = digestCard(digest, '', cmd.kind === 'digest' ? '🧾 整理' : '📝 已記下');
     return void (await reply(
       card ??
         noticeCard(
@@ -212,8 +246,16 @@ export async function groupText(event: any, line: Line, owner: string) {
 }
 
 /** The owner's 「發到群組：…」 in the 1:1 chat. Returns false when the text is something else. */
-export async function ownerGroupSend(text: string, userId: string, reply: Reply, line: Line, rid: string) {
-  const groups = await listGroups();
+export async function ownerGroupSend(
+  text: string,
+  userId: string,
+  reply: Reply,
+  line: Line,
+  rid: string,
+  allowed?: (groupId: string) => boolean,
+) {
+  // With orbs, only groups whose lit orb has a 「公告」 piece (or that no orb is set to) take announcements.
+  const groups = (await listGroups()).filter((g) => !allowed || allowed(g.group_id));
   const want = groupSendIntent(text, groups);
   if (!want) return false;
   if ('none' in want) {

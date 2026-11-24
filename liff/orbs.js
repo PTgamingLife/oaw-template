@@ -349,7 +349,12 @@ export async function orbsView(h, show, call) {
     const list = h('ul', {}, cur.pieces.map((p) => h('li', {}, `${TYPES[p.type][0]}：${p.text}`)));
     const slot = cur.slot;
     sheet('AI 整理好了', note || null, [
-      [cur.on ? '更新光球' : '啟動光球', async () => (await server('orb_toggle', { slot, on: true })) && home()],
+      [cur.on ? '更新光球' : '啟動光球', async () => {
+        const r = await server('orb_toggle', { slot, on: true });
+        if (!r) return;
+        home();
+        if (r.timed === false) notice('光球已啟動', '定時功能（定時推播、提醒、統計截止）暫時無法排程，其他功能正常。請稍後再開關一次光球，或聯絡專員。');
+      }],
       ['再調整', null, 'ghost'],
     ], [h('div', { class: 'good' }, list), alone.length ? h('p', {}, `「${alone.join('、')}」沒有和其他拼圖連結，會各自獨立運作。`) : null], true);
   }

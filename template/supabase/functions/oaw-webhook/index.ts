@@ -21,6 +21,9 @@ import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-s
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import { bindNamedGroup, groupPostback, groupPrefs, groupText, ownerGroupSend } from '../_shared/groups.ts';
 import { groupHelp } from '../_shared/group-intent.ts';
+import { loadOrbs } from '../_shared/orbs.ts';
+import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
+import { orbText } from '../_shared/orb-run.ts';
 import {
   listLinks,
   saveReceived,
@@ -84,7 +87,13 @@ async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
     ]);
     return;
   }
-  if (await groupBound(groupId)) await groupText(event, line, owner);
+  if (!(await groupBound(groupId))) return;
+  const orbs = await loadOrbs().catch(() => []);
+  const orb = orbFor(orbs, groupId);
+  if (orb) return void (await orbText(event, line, owner, orb, groupId));
+  // An orb is set to this group but switched off: nothing runs and nothing is kept.
+  if (orbClaims(orbs, groupId)) return;
+  await groupText(event, line, owner);
 }
 
 async function handle(event: any, line: ReturnType<typeof lineClient>) {
@@ -171,13 +180,24 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         ),
       ));
   }
+  const orbs = owner === userId ? await loadOrbs().catch(() => []) : [];
   // 「發到群組：…」: an announcement to a bound group, confirmed before it is sent.
   if (
     owner === userId &&
     /^發到/.test(event.message.text.trim()) &&
-    (await ownerGroupSend(event.message.text, userId, reply, line, String(event.webhookEventId ?? '')))
+    (await ownerGroupSend(
+      event.message.text,
+      userId,
+      reply,
+      line,
+      String(event.webhookEventId ?? ''),
+      (g) => (orbClaims(orbs, g) ? Boolean(pieceOf(orbFor(orbs, g), 'announce')) : true),
+    ))
   )
     return;
+  // The owner's own orb: its 指令 word and 回答 call word are answered before anything else.
+  const mine = orbFor(orbs, 'me');
+  if (mine && (await orbText(event, line, owner, mine, userId))) return;
   const health = await healthChat(event, userId, owner, line);
   if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);
@@ -329,7 +349,19 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           );
           return;
         }
-        await saveMessage(userId, true, event.message.text);
+        // With orbs, the 1:1 chat is only recorded by a lit orb that has a 「紀錄」 piece.
+        if (orbClaims(orbs, 'me') && !pieceOf(mine, 'record')) {
+          const liff = env('LIFF_URL');
+          await reply(
+            noticeCard(
+              '這則沒有記下',
+              mine ? '個人對話的光球沒有「紀錄」拼圖。' : '個人對話的光球目前是關閉的。',
+              liff ? { label: '打開我的 AI 秘書', uri: `${liff}?view=orbs` } : undefined,
+            ),
+          );
+          return;
+        }
+        await saveMessage(userId, true, event.message.text, userId);
         await reply(noticeCard('📝 已記下', RECORDED));
         return;
       }

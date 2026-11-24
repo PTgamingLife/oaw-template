@@ -12,6 +12,8 @@ import {
   type Issue,
   type Orb,
 } from './orb-model.ts';
+import { cronJobs } from './orb-logic.ts';
+import { PX } from './px.ts';
 import { apricoKey, db, env, T } from './store.ts';
 
 export async function loadOrbs(): Promise<Orb[]> {
@@ -43,6 +45,17 @@ async function saveOrb(orb: Orb) {
   if (error) throw Error('orb_save_failed');
 }
 
+/**
+ * Register the timed jobs of the lit orbs in this app's database (pg_cron). Returns false
+ * when timed jobs are not available there; the orbs still work, only the clock pieces wait.
+ */
+export async function syncCron(orbs: Orb[]) {
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${PX}-digest`;
+  const { error } = await db.rpc(T('cron_sync'), { jobs: cronJobs(orbs), url });
+  if (error) console.warn('oaw cron sync failed:', error.code ?? 'unknown');
+  return !error;
+}
+
 async function view(orbs: Orb[]) {
   return {
     orbs,
@@ -72,14 +85,14 @@ export async function orbAction(action: string, body: any, requestId: string) {
     const orb = orbs[at];
     if (body.on === true && !orbReady(orb, orbs)) throw Error('orb_not_ready');
     await put({ ...orb, on: body.on === true });
-    return view(orbs);
+    return { ...(await view(orbs)), timed: await syncCron(orbs) };
   }
 
   const orb = cleanOrb(body.orb, slot, groups);
   if (action === 'orb_save') {
     // A draft: an orb that is no longer complete goes dark until it is confirmed again.
     await put({ ...orb, on: orb.on && orbReady(orb, orbs) });
-    return view(orbs);
+    return { ...(await view(orbs)), timed: await syncCron(orbs) };
   }
   if (action !== 'orb_check') throw Error('unknown_action');
 
@@ -128,5 +141,6 @@ export async function orbAction(action: string, body: any, requestId: string) {
   }
   // Confirming never lights the orb by itself; the owner presses 啟動 (orb_toggle) after this.
   await put({ ...orb, on: orb.on && !issues.length });
+  await syncCron(orbs);
   return { ...(await view(orbs)), issues, note, ready: !issues.length };
 }

@@ -173,10 +173,10 @@ export async function groupBound(groupId: string) {
   return Boolean(data);
 }
 
-export async function saveMessage(sourceId: string, isOwner: boolean, text: string) {
+export async function saveMessage(sourceId: string, isOwner: boolean, text: string, sender = '') {
   await db
     .from(T('messages'))
-    .insert({ source_id: sourceId, is_owner: isOwner, text: text.slice(0, 500) });
+    .insert({ source_id: sourceId, is_owner: isOwner, text: text.slice(0, 500), sender: sender || null });
 }
 
 /** Chats (groups, the owner's own notes) that have unprocessed lines. */
