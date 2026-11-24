@@ -318,6 +318,10 @@ async function main() {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定 AI 秘書。');
     return (await import('./orbs.js')).orbsView(h, show, call);
   }
+  if (params.get('view') === 'calendar') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以看行事曆。');
+    return (await import('./calendar.js')).calendarView(h, show, call);
+  }
   if (params.get('view') === 'groups') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定群組。');
     return (await import('./groups.js')).groupsView(h, show, call);

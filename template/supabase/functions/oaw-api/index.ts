@@ -21,6 +21,7 @@ import { groupAction } from '../_shared/groups.ts';
 import { loadOrbs, orbAction } from '../_shared/orbs.ts';
 import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
+import { calendarAction } from '../_shared/calendar.ts';
 import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
@@ -182,6 +183,12 @@ Deno.serve(async (req) => {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action !== 'orb_list');
       return respond(await orbAction(body.action, body, `orb-${crypto.randomUUID()}`));
+    }
+    if (body.action === 'cal_month' || body.action === 'cal_delete') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      // Looking needs an unlocked owner; removing an entry needs the PIN.
+      await guardOwner(user.sub, body.action === 'cal_delete');
+      return respond(await calendarAction(body.action, body));
     }
     if (body.action === 'orb_menu_publish') {
       // Secretary edition: the fixed four-cell menu, drawn by the orb page, for every friend.
