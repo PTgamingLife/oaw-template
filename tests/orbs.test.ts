@@ -7,6 +7,7 @@ import {
   linkedGroups,
   localIssues,
   menuButtons,
+  orbMenu,
   orbReady,
 } from '../template/supabase/functions/_shared/orb-model.ts';
 
@@ -123,4 +124,14 @@ test('tally: latest line wins per member, cancel removes, totals use item prices
   assert.match(text, /合計 270 元/);
   assert.match(text, /小華：排骨×2（不要辣） 180 元/);
   assert.equal(tallyText(tallyTotals([], items, 'last'), '便當', true, (l) => l), '目前還沒有人登記便當。');
+});
+
+test('the secretary menu has four cells: 打開秘書, then each orb\'s word or a way into the orb page', () => {
+  const m = orbMenu(defaultOrbs(), 'cafe', 'https://liff.line.me/1-a');
+  assert.deepEqual(m.size, { width: 1200, height: 405 });
+  assert.equal(m.name, 'cafe-main');
+  assert.deepEqual(m.areas.map((a) => a.bounds.x), [0, 300, 600, 900]);
+  assert.deepEqual(m.areas.map((a: any) => a.action.label), ['打開秘書', '行事曆', '光球 2', '光球 3']);
+  assert.deepEqual(m.areas[1].action, { type: 'message', label: '行事曆', text: '行事曆' });
+  assert.equal((m.areas[2].action as any).uri, 'https://liff.line.me/1-a?view=orbs');
 });

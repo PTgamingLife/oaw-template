@@ -136,3 +136,7 @@ body.orbs-mode main{max-width:none;height:100%;padding:0;margin:0}
 #orbs-stage .note{font-size:11px;color:var(--ink-soft);text-align:center;margin:6px 0 0}
 @media (prefers-reduced-motion:reduce){#orbs-stage *{animation:none!important;transition:none!important}}
 #orbs-stage .busy{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(237,231,251,.7);font-weight:700}
+#orbs-stage a.btn3d{display:block;text-align:center;text-decoration:none}
+#orbs-stage .menu .btn3d{justify-self:start}
+#orbs-stage .tools{display:flex;flex-wrap:wrap;gap:8px}
+#orbs-stage .tools .btn3d{width:auto}

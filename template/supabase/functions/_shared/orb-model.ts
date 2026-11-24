@@ -212,3 +212,26 @@ export function linkedGroups(orb: Orb): number[][] {
   for (const p of orb.pieces) groups.set(find(p.id), [...(groups.get(find(p.id)) ?? []), p.id]);
   return [...groups.values()];
 }
+
+/**
+ * The fixed secretary-edition LINE menu: 打開秘書 plus one cell per orb. A lit orb with a
+ * 「指令」 piece sends its word; the other cells open the orb page.
+ */
+export function orbMenu(orbs: Orb[], px: string, liffUrl: string) {
+  const open = { type: 'uri', label: '打開秘書', uri: `${liffUrl}?view=orbs` };
+  const cells = [
+    open,
+    ...menuButtons(orbs).map((word, i) =>
+      word
+        ? { type: 'message', label: word, text: word }
+        : { type: 'uri', label: `光球 ${i + 1}`, uri: `${liffUrl}?view=orbs` },
+    ),
+  ];
+  return {
+    size: { width: 1200, height: 405 },
+    selected: true,
+    name: `${px}-main`,
+    chatBarText: '打開秘書選單',
+    areas: cells.map((action, i) => ({ bounds: { x: i * 300, y: 0, width: 300, height: 405 }, action })),
+  };
+}

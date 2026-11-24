@@ -81,6 +81,68 @@ export async function orbsView(h, show, call) {
     }
   }
 
+  /* ---------- the fixed four-cell LINE menu, drawn here and published by the server ---------- */
+  let published = state.buttons.join('|');
+  async function drawMenu() {
+    const c = document.createElement('canvas');
+    c.width = 1200;
+    c.height = 405;
+    const g = c.getContext('2d');
+    const sky = g.createLinearGradient(0, 0, 1200, 405);
+    sky.addColorStop(0, '#EDE7FB');
+    sky.addColorStop(0.55, '#D9E4FB');
+    sky.addColorStop(1, '#F7F2FF');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, 1200, 405);
+    const face = await new Promise((done) => {
+      const im = new Image();
+      im.onload = () => done(im);
+      im.onerror = () => done(null);
+      im.src = 'assets/secretary.png';
+    });
+    const labels = ['打開秘書', ...state.buttons.map((w, i) => w || `光球 ${i + 1}`)];
+    labels.forEach((label, i) => {
+      const x = 22 + i * 294,
+        lit = i === 0 || Boolean(state.buttons[i - 1]);
+      g.fillStyle = '#C9CEF2';
+      g.beginPath();
+      g.roundRect(x, 34, 274, 360, 44);
+      g.fill();
+      g.fillStyle = 'rgba(255,255,255,.95)';
+      g.beginPath();
+      g.roundRect(x, 22, 274, 360, 44);
+      g.fill();
+      const cx = x + 137,
+        cy = 160;
+      const orb = g.createRadialGradient(cx - 28, cy - 34, 6, cx, cy, 88);
+      (lit ? ['#fff', '#FFF6C9', '#FFE07A', '#FFC53D', '#FFA826'] : ['#fff', '#E9EAF3', '#D7DAE8', '#C9CCDD', '#AEB2C8']).forEach((col, k) => orb.addColorStop(k / 4, col));
+      g.shadowColor = lit ? 'rgba(255,214,92,.9)' : 'rgba(120,125,160,.25)';
+      g.shadowBlur = 34;
+      g.fillStyle = orb;
+      g.beginPath();
+      g.arc(cx, cy, 88, 0, Math.PI * 2);
+      g.fill();
+      g.shadowBlur = 0;
+      if (i === 0 && face) {
+        const hgt = 138,
+          wid = (face.width / face.height) * hgt;
+        g.drawImage(face, cx - wid / 2, cy - hgt / 2, wid, hgt);
+      }
+      g.fillStyle = '#2B2A4A';
+      g.font = "900 44px 'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif";
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(label.slice(0, 5), cx, 318, 250);
+    });
+    return c.toDataURL('image/png').split(',')[1];
+  }
+  async function publishMenu(quiet) {
+    const r = await server('orb_menu_publish', { image: await drawMenu() }, '更新 LINE 選單…');
+    if (r) published = state.buttons.join('|');
+    if (r && !quiet) notice('LINE 選單已更新', '關閉這個頁面，回到聊天室就能看到新的四格選單。');
+  }
+  const menuChanged = () => published !== state.buttons.join('|');
+
   /* ---------- home ---------- */
   function home() {
     clearInterval(moodTimer);
@@ -115,6 +177,11 @@ export async function orbsView(h, show, call) {
     };
     moodTimer = setInterval(mood, 4200);
     img.addEventListener('click', mood);
+    const menuBtn = h('button', { class: 'btn3d ghost small', type: 'button' }, '更新 LINE 選單');
+    menuBtn.addEventListener('click', () => publishMenu(false));
+    const more = h('a', { class: 'btn3d ghost small', href: '?view=secretary' }, '更多設定');
+    const cal = h('button', { class: 'btn3d ghost small', type: 'button' }, '📅 加入 Google／iPhone 行事曆');
+    cal.addEventListener('click', () => calendarSheet('ics_link'));
     stage.replaceChildren(
       h(
         'section',
@@ -125,20 +192,37 @@ export async function orbsView(h, show, call) {
         h(
           'div',
           { class: 'menu' },
-          h('p', {}, 'LINE 選單（每顆光球的「指令」拼圖變成一顆按鈕）'),
+          h('p', {}, 'LINE 選單（光球的「指令」拼圖變成按鈕，啟動或關閉光球時自動更新）'),
           h(
             'div',
             { class: 'cells' },
             h('div', { class: 'cell' }, '打開秘書'),
             state.buttons.map((w) => h('div', { class: 'cell' + (w ? '' : ' empty') }, w || '未設定')),
           ),
+          h('div', { class: 'tools' }, cal, menuBtn, more),
         ),
       ),
     );
   }
+  // Calendar subscription: one-way (秘書 → 行事曆); Google refreshes it a few times a day.
+  async function calendarSheet(action) {
+    const r = await server(action, {}, '準備連結…');
+    if (!r?.feed) return;
+    const link = (label, href, cls) => h('a', { class: 'btn3d ' + cls, href, target: '_blank', rel: 'noopener' }, label);
+    sheet(
+      '把行程放進行事曆',
+      '訂閱後，秘書記下的行程會出現在你的行事曆（單向同步）。Google 行事曆大約半天到一天更新一次。這個連結等於鑰匙，請不要分享給別人。',
+      [['重新產生連結（舊連結失效）', () => calendarSheet('ics_reset'), 'ghost'], ['關閉', null, 'ghost']],
+      [link('加入 Google 行事曆', r.google, ''), link('加入 iPhone／Mac 行事曆', r.apple, 'ghost')],
+    );
+  }
   function orbSheet(o) {
     const ready = o.pieces.length && o.target && o.pieces.every((p) => p.params);
-    const toggle = async (on) => (await server('orb_toggle', { slot: o.slot, on })) && home();
+    const toggle = async (on) => {
+      if (!(await server('orb_toggle', { slot: o.slot, on }))) return;
+      if (menuChanged()) await publishMenu(true);
+      home();
+    };
     sheet(
       o.name,
       o.on ? '關閉後，這顆光球的功能會暫停，設定會保留。' : ready ? '這顆光球已經設定好，可以直接開啟。' : '這顆光球還沒設定完成，請先點進去放拼圖並按「確認」。',
@@ -352,6 +436,7 @@ export async function orbsView(h, show, call) {
       [cur.on ? '更新光球' : '啟動光球', async () => {
         const r = await server('orb_toggle', { slot, on: true });
         if (!r) return;
+        if (menuChanged()) await publishMenu(true);
         home();
         if (r.timed === false) notice('光球已啟動', '定時功能（定時推播、提醒、統計截止）暫時無法排程，其他功能正常。請稍後再開關一次光球，或聯絡專員。');
       }],
