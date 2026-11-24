@@ -48,12 +48,12 @@ export function lineClient(token: string, fetcher = fetch) {
       call('/v2/bot/message/push', { to, messages: messages.slice(0, 5) }),
     profile: (userId: string) =>
       call(`/v2/bot/profile/${encodeURIComponent(userId)}`, undefined, 'GET'),
-    async publishMenu(menu: unknown, png: Uint8Array<ArrayBuffer>, name: string) {
+    async publishMenu(menu: unknown, png: Uint8Array<ArrayBuffer>, name: string, type = 'image/png') {
       const { richmenus = [] } = await call('/v2/bot/richmenu/list', undefined, 'GET');
       const { richMenuId } = await call('/v2/bot/richmenu', menu);
       const up = await fetcher(`${DATA_API}/v2/bot/richmenu/${richMenuId}/content`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/png' },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': type },
         body: png,
       });
       if (!up.ok) throw Error(`line_menu_image_${up.status}`);

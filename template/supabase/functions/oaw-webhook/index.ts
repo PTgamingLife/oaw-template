@@ -41,6 +41,7 @@ import {
   loadConfig,
   onceToday,
   ownerId,
+  IMAGE_BASE,
   peekPending,
   saveMessage,
   saveConfig,
@@ -154,7 +155,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     const health = await healthChat(event, userId, ownerNow, line);
     if (health) return void (await reply(health));
     const index = postbackCell(String(event.postback?.data ?? ''), config);
-    if (index >= 0) await reply(cellMessage(config, index));
+    if (index >= 0) await reply(cellMessage(config, index, IMAGE_BASE));
     return;
   }
   if (event.type !== 'message' || event.message?.type !== 'text') return;
@@ -284,7 +285,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
 
   switch (intent.kind) {
     case 'cell':
-      await reply(cellMessage(config, intent.index));
+      await reply(cellMessage(config, intent.index, IMAGE_BASE));
       return;
     case 'cancel':
       await takePending(userId);

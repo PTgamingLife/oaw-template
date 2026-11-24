@@ -20,7 +20,28 @@ export type Cell = {
   action: 'message' | 'full' | 'web';
   content: string;
   format?: 'text' | 'card';
+  /** Picture drawn on this menu cell (領航者版): a file name in the design image bucket. */
+  img?: string;
 };
+/** Card look (領航者版). `hero` is the picture on top of every card when head is 'image'. */
+export const CARD_HEADS = ['band', 'plain', 'image'] as const;
+export const CARD_SIZES = ['kilo', 'mega', 'giga'] as const;
+export type Card = {
+  head: (typeof CARD_HEADS)[number];
+  size: (typeof CARD_SIZES)[number];
+  hero: string;
+};
+export const IMAGE_NAME = /^[a-z0-9]{16}\.jpg$/;
+const image = (v: unknown, field: string) => {
+  if (v === undefined || v === '') return '';
+  if (typeof v !== 'string' || !IMAGE_NAME.test(v)) throw Error('invalid_' + field);
+  return v;
+};
+export function cleanCard(v: any): Card {
+  if (v === undefined) return { head: 'band', size: 'mega', hero: '' };
+  if (!v || !CARD_HEADS.includes(v.head) || !CARD_SIZES.includes(v.size)) throw Error('invalid_card');
+  return { head: v.head, size: v.size, hero: image(v.hero, 'card_hero') };
+}
 export type Config = {
   oaName: string;
   grid: 4 | 6 | 8;
@@ -28,6 +49,7 @@ export type Config = {
   /** Menu cell shape, index into SHAPES (configs from before shapes default to 0). */
   shape: number;
   cells: Cell[];
+  card: Card;
   welcome: string;
   failure: string;
   secretary: boolean;
@@ -59,6 +81,7 @@ export function validateConfig(value: unknown): Config {
       action: c.action,
       content,
       format: c.format ?? 'text',
+      img: image(c.img, 'cell_img'),
     };
   });
   return {
@@ -67,6 +90,7 @@ export function validateConfig(value: unknown): Config {
     theme: v.theme,
     shape,
     cells,
+    card: cleanCard(v.card),
     welcome: str(v.welcome, 500, 'welcome'),
     failure: str(v.failure, 300, 'failure'),
     secretary: v.secretary === true,
@@ -134,27 +158,44 @@ export function postbackCell(data: string, config: Config) {
   return index >= 0 && index < config.grid ? index : -1;
 }
 
-/** Reply message for a menu cell. */
-export function cellMessage(config: Config, index: number) {
+/**
+ * Reply message for a menu cell. `imageBase` is the public URL prefix of the design image
+ * bucket; without it (or without a picture) an 'image' card falls back to the colour band.
+ */
+export function cellMessage(config: Config, index: number, imageBase = '') {
   const cell = config.cells[index];
   const text = cell.content || config.failure;
   if (cell.format !== 'card') return { type: 'text', text: text.slice(0, 5000) };
   const color = THEMES[config.theme][index % 4];
+  const { head, size, hero } = config.card;
+  const title = { type: 'text', text: cell.label || config.oaName, weight: 'bold', size: 'lg', wrap: true };
+  const picture = head === 'image' && hero && imageBase;
+  const band = head === 'band' || (head === 'image' && !picture);
   return {
     type: 'flex',
     altText: (cell.label || config.oaName).slice(0, 400),
     contents: {
       type: 'bubble',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        backgroundColor: color,
-        contents: [{ type: 'text', text: cell.label || config.oaName, weight: 'bold', size: 'lg' }],
-      },
+      size,
+      ...(band
+        ? { header: { type: 'box', layout: 'vertical', backgroundColor: color, contents: [title] } }
+        : {}),
+      ...(picture
+        ? {
+            hero: {
+              type: 'image',
+              url: imageBase + hero,
+              size: 'full',
+              aspectRatio: '20:13',
+              aspectMode: 'cover',
+            },
+          }
+        : {}),
       body: {
         type: 'box',
         layout: 'vertical',
-        contents: [{ type: 'text', text, wrap: true }],
+        spacing: 'md',
+        contents: band ? [{ type: 'text', text, wrap: true }] : [title, { type: 'text', text, wrap: true }],
       },
     },
   };
@@ -204,5 +245,6 @@ export function publicConfig(config: Config) {
     colors: THEMES[config.theme],
     shape: config.shape,
     cells: config.cells.slice(0, config.grid),
+    card: config.card,
   };
 }

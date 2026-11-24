@@ -22,7 +22,7 @@ import { loadOrbs, orbAction } from '../_shared/orbs.ts';
 import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
-import { designChat, designOpen } from '../_shared/design.ts';
+import { decodeJpeg, designChat, designOpen, designUpload, jpegSize } from '../_shared/design.ts';
 import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
       const out = await orbAction(body.action, body, `orb-${crypto.randomUUID()}`);
       return respond(body.action === 'orb_list' ? { ...out, plan: (await quota()).plan ?? 'secretary' } : out);
     }
-    if (['design_open', 'design_chat', 'design_apply'].includes(body.action)) {
+    if (['design_open', 'design_chat', 'design_upload', 'design_apply'].includes(body.action)) {
       // 領航者版 only. Drafting needs an unlocked owner; going live needs the PIN.
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action === 'design_apply');
@@ -195,11 +195,21 @@ Deno.serve(async (req) => {
       if (body.action === 'design_open') return respond(await designOpen());
       if (body.action === 'design_chat')
         return respond(await designChat(body.request, body.config));
+      if (body.action === 'design_upload') return respond(await designUpload(body.image));
       const next = validateConfig(body.config);
-      const png = decodePng(body.image);
-      await saveConfig(next);
+      // A menu with photos is sent as JPEG so it stays under LINE's 1 MB limit.
+      const jpeg = body.type === 'jpeg';
+      const image = jpeg ? (decodeJpeg(body.image, MAX_IMAGE) as Uint8Array<ArrayBuffer>) : decodePng(body.image);
+      const size = jpeg ? jpegSize(image) : null;
+      if (jpeg && (size?.width !== 1200 || size.height !== 810)) throw Error('image_size_invalid');
+      await saveConfig(next, true);
       const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
-      const id = await line.publishMenu(richMenu(next, PX, env('LIFF_URL')), png, `${PX}-main`);
+      const id = await line.publishMenu(
+        richMenu(next, PX, env('LIFF_URL')),
+        image,
+        `${PX}-main`,
+        jpeg ? 'image/jpeg' : 'image/png',
+      );
       await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
       return respond({ ok: true, richMenuId: id });
     }
@@ -285,7 +295,7 @@ Deno.serve(async (req) => {
     const code = e instanceof Error && /^[a-z_0-9]{3,40}$/.test(e.message) ? e.message : 'failed';
     console.warn('oaw api failed:', code);
     const status =
-      code.startsWith('image_') || code.startsWith('invalid_') || code.endsWith('_invalid')
+      code.startsWith('image_') || code.startsWith('invalid_') || code.endsWith('_invalid') || code === 'photos_full'
         ? 400
         : code === 'health_forbidden' || code === 'consent_required' || code === 'owner_only' || code === 'navigator_required'
           ? 403
