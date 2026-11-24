@@ -181,7 +181,7 @@ async function supabaseProject(token, px, previous) {
   const orgs = await api(SB, '/v1/organizations', { token }).catch((e) => {
     if (/HTTP 40[13]/.test(e.message))
       throw Error(
-        'Supabase Token 沒有建立專案的權限：請改用帳號層級的 Access Token，或在 Variables 設定 OAW_SB_REF 使用既有專案',
+        'Supabase Token 不能用：可能複製不完整、已過期或被刪除，或是有權限限制的 Token。請到 Supabase 的 Access Tokens 重新產生一組再試一次',
       );
     throw e;
   });
