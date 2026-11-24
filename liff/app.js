@@ -262,6 +262,19 @@ async function settingsView(view) {
       ? h(
           'section',
           { class: 'card' },
+          h('h3', {}, '✨ 我的 AI 秘書'),
+          h(
+            'p',
+            { class: 'muted' },
+            '三顆光球，每顆管一個對話（個人或群組）。放上拼圖，設定要記錄、整理、提醒或統計什麼。',
+          ),
+          h('a', { class: 'btn primary', href: '?view=orbs' }, '打開光球設定'),
+        )
+      : null,
+    data.view === 'secretary'
+      ? h(
+          'section',
+          { class: 'card' },
           h('h3', {}, '🔗 跨帳號連結'),
           h(
             'p',

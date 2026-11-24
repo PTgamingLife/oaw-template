@@ -22,8 +22,11 @@ export async function loadOrbs(): Promise<Orb[]> {
   if (error) throw Error('orbs_unavailable');
   const base = defaultOrbs();
   if (!data?.length) {
-    // First visit: orb 1 starts lit with the calendar secretary.
+    // First visit: orb 1 starts lit with the calendar secretary (dark on the health template,
+    // which has its own reminders), and its timed pieces are registered right away.
+    if (env('TEMPLATE') === 'health') base[0].on = false;
     await db.from(T('orbs')).upsert(base.map((o) => ({ slot: o.slot, data: o })));
+    await syncCron(base).catch(() => false);
     return base;
   }
   const saved = new Map(data.map((r: { slot: number; data: unknown }) => [r.slot, r.data]));

@@ -27,10 +27,11 @@ async function todos(sourceId: string) {
   return (data ?? []).map((t: { title: string }) => `・${t.title}`);
 }
 
-/** 行事曆 / 清單 / 摘要 of one conversation as a card. */
-export async function viewCard(show: string, sourceId: string) {
+/** 行事曆 / 清單 / 摘要 of one conversation as a card; null when `quiet` and there is nothing. */
+export async function viewCard(show: string, sourceId: string, quiet = false) {
   const events = show === 'list' ? [] : (await upcomingEvents(sourceId)).map(eventLine);
   const list = show === 'calendar' ? [] : await todos(sourceId);
+  if (quiet && !events.length && !list.length) return null;
   if (show === 'calendar')
     return noticeCard('📅 接下來 7 天', events.length ? events.join('\n') : '接下來 7 天沒有行程。');
   if (show === 'list') return noticeCard('✅ 待辦', list.length ? list.join('\n') : '目前沒有待辦。');
@@ -122,7 +123,7 @@ export async function orbText(event: any, line: Line, owner: string, orb: Orb, s
   };
   if (command && text === command.params!.word) {
     if (command.params!.show === 'stats' && stats) await tally();
-    else await reply(await viewCard(String(command.params!.show), sourceId));
+    else await reply((await viewCard(String(command.params!.show), sourceId))!);
     return true;
   }
   if (stats && text === stats.params!.word) {
@@ -174,8 +175,10 @@ export async function runJob(name: string, orbs: Orb[], owner: string, line: Lin
   const card =
     p.show === 'stats' && stats && orb.target !== 'me'
       ? await runTally(stats, to, line, `tally-push-${taipeiDay()}-${orb.slot}-${piece.id}`)
-      : await viewCard(p.show === 'stats' ? 'summary' : p.show, to);
-  if (!card || card === 'quota') return 'tally_failed';
+      : await viewCard(p.show === 'stats' ? 'summary' : p.show, to, true);
+  // A timed push with nothing to show stays silent instead of sending an empty card every day.
+  if (!card) return 'nothing';
+  if (card === 'quota') return 'tally_failed';
   await line.push(to, [card]);
   return 'sent';
 }
