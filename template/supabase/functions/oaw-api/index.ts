@@ -28,6 +28,7 @@ import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
 import {
+  APRICO_PAGES,
   DEFAULT_SUBSCRIBE_URL,
   EXAMPLES,
   INTERFACE_TEMPLATES,
@@ -42,6 +43,8 @@ type Quota = {
   extraTwdLeft?: number;
   paidUntil?: string;
   plan?: 'navigator' | 'secretary';
+  /** The newest released version, as Aprico reports it ('' when it does not say). */
+  latest?: string;
 };
 
 /** Subscription quota from Aprico; anything other than a clear "paid" counts as unpaid. */
@@ -59,10 +62,12 @@ async function quota(): Promise<Quota> {
     });
     const q = res.ok ? await res.json() : null;
     const plan = q?.plan === 'navigator' ? 'navigator' : 'secretary';
-    if (q?.paid !== true) return { paid: false, plan };
+    const latest = /^\d{4}\.\d{2}\.\d{2}(\.\d+)?$/.test(q?.latest ?? '') ? (q.latest as string) : '';
+    if (q?.paid !== true) return { paid: false, plan, latest };
     return {
       paid: true,
       plan,
+      latest,
       percentLeft: Math.max(0, Math.min(100, Number(q.percentLeft) || 0)),
       extraTwdLeft: Math.max(0, Number(q.extraTwdLeft) || 0),
       paidUntil: typeof q.paidUntil === 'string' ? q.paidUntil : '',
@@ -279,6 +284,9 @@ Deno.serve(async (req) => {
         ...(await quota()),
         fee: MONTHLY_FEE,
         subscribeUrl: env('APRICO_SUBSCRIBE_URL') || DEFAULT_SUBSCRIBE_URL,
+        // Aprico's pages for adding quota and for updating this app to the newest version.
+        topupUrl: APRICO_PAGES + 'build.html?topup=1',
+        updateUrl: APRICO_PAGES + 'build.html?update=1',
         templates: view === 'interface' ? INTERFACE_TEMPLATES : SECRETARY_TEMPLATES,
         examples: EXAMPLES,
         tutorial: TUTORIAL,

@@ -19,8 +19,7 @@ import { PX } from '../_shared/px.ts';
 import { healthEnabled, healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
-import { bindNamedGroup, groupPostback, groupPrefs, groupText, ownerGroupSend } from '../_shared/groups.ts';
-import { groupHelp } from '../_shared/group-intent.ts';
+import { bindNamedGroup, groupPostback, groupText, ownerGroupSend } from '../_shared/groups.ts';
 import { loadOrbs, sharedPersona } from '../_shared/orbs.ts';
 import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
 import { orbText } from '../_shared/orb-run.ts';
@@ -76,14 +75,16 @@ async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
   const userId: string = event.source.userId ?? '';
   if (!groupId) return;
   const owner = await ownerId();
-  if (event.message.text.trim() === '綁定群組') {
+  if (['綁定', '綁定群組'].includes(event.message.text.trim())) {
     if (!owner || userId !== owner) return;
     await bindNamedGroup(line, event.source);
+    const liff = env('LIFF_URL');
+    // Binding only makes the group selectable; what happens here is decided by its orb.
     await line.reply(event.replyToken, [
       noticeCard(
-        '📝 開始記錄這個群組',
-        '這個群組裡提到的行程、帳務和待辦，每晚 9 點整理後私訊給管理者。\n\n' +
-          groupHelp((await groupPrefs()).wake),
+        '✅ 已綁定這個群組',
+        '接下來請管理者打開秘書，點一顆光球，在「對話對象」選這個群組，再放上想要的拼圖。光球開啟之前，這裡不會記錄任何內容。',
+        liff ? { label: '打開秘書', uri: `${liff}?view=orbs` } : undefined,
       ),
     ]);
     return;

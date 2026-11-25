@@ -227,7 +227,9 @@ export const TUTORIAL = [
 ];
 
 /** Every secretary reply is a small branded card instead of plain text. */
-export const DEFAULT_SUBSCRIBE_URL = 'https://liff.line.me/2012197506-Vmb4O5iT/member.html';
+/** Aprico's own pages (member centre, build centre), opened inside LINE. */
+export const APRICO_PAGES = 'https://liff.line.me/2012197506-Vmb4O5iT/';
+export const DEFAULT_SUBSCRIBE_URL = APRICO_PAGES + 'member.html';
 
 /** Shown when the month's quota, the free NT$20 extra and any top-up are all used. */
 export function quotaCard(subscribeUrl: string) {

@@ -153,3 +153,5 @@ body.orbs-mode main{max-width:none;height:100%;padding:0;margin:0}
 #orbs-stage .tray .tools{padding:0 8px}
 #orbs-stage .sheet p{white-space:pre-line}
 #orbs-stage .sheet .steps{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px;line-height:1.6;color:var(--ink)}
+#orbs-stage .sheet .steps img{display:block;width:100%;max-width:300px;height:auto;margin-top:6px;border-radius:12px;border:1px solid var(--line)}
+#orbs-stage .sheet{max-height:86dvh;overflow-y:auto}

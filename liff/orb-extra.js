@@ -117,15 +117,16 @@ export function tray(ui, cur, state, on) {
 }
 
 /** LINE has no join-by-link for official accounts: a member has to invite it into the group. */
-export function addGroupHelp(ui, basicId) {
+export function addGroupHelp(ui, basicId, refresh) {
   const { h, sheet } = ui;
+  const pic = (name, alt) => h('img', { src: `assets/help/${name}.jpg`, alt, loading: 'lazy' });
   const steps = [
-    '到 LINE 官方帳號後台，確認「聊天 → 加入群組或多人聊天室」是開啟的。',
-    `在要加入的群組裡按「邀請」，選這個官方帳號${basicId ? `（${basicId}）` : ''}。`,
-    '官方帳號進群後，在群組裡說一句「綁定」。',
-    '回到這一頁重新整理，對話對象就會出現那個群組。',
+    ['到 LINE 官方帳號管理後台的「設定 → 帳號」，把「加入群組或多人聊天室」設成「允許」。', pic('group-allow', '功能切換裡的「加入群組或多人聊天室」設為允許')],
+    [`在要加入的群組裡按「邀請」，選這個官方帳號${basicId ? `（${basicId}）` : ''}。`],
+    ['官方帳號進群後，由你本人在群組裡說一句「綁定」，秘書會回覆「已綁定這個群組」。', pic('group-bind', '在群組裡傳「綁定」')],
+    ['按下面的「我綁定好了」，對話對象就會出現那個群組。'],
   ];
-  sheet('新增群組', '官方帳號沒有辦法用連結自己加入群組，要由群組成員邀請它。', [['知道了', null]], [h('ol', { class: 'steps' }, steps.map((t) => h('li', {}, t)))], true);
+  sheet('新增群組', '官方帳號沒有辦法用連結自己加入群組，要由群組成員邀請它。', [['我綁定好了', refresh], ['先不用', null, 'ghost']], [h('ol', { class: 'steps' }, steps.map((t) => h('li', {}, t)))], true);
 }
 
 /** Long-press on an orb: say in plain words what to change, or switch the orb on and off. */
