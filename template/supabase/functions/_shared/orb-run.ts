@@ -89,6 +89,9 @@ export async function tallyData(piece: Piece, groupId: string, line: Line, reque
       requestId,
       subject: p.subject,
       items: p.items.map((i: { name: string }) => i.name),
+      ...(p.measures?.length
+        ? { measures: p.measures.map((m: { name: string; unit: string }) => `${m.name}${m.unit ? ` (${m.unit})` : ''}`) }
+        : {}),
       lines: rows.map((r) => ({ who: labels.get(r.sender), text: r.text })),
     }),
     signal: AbortSignal.timeout(60000),
@@ -96,7 +99,7 @@ export async function tallyData(piece: Piece, groupId: string, line: Line, reque
   if (res?.status === 402) return 'quota' as const;
   const out = res?.ok ? await res.json().catch(() => null) : null;
   if (!Array.isArray(out?.entries)) return null;
-  const totals = tallyTotals(out.entries, p.items, p.dedupe);
+  const totals = tallyTotals(out.entries, p.items, p.dedupe, p.measures?.length ?? 0);
   // Names are looked up here and never sent to Aprico.
   const names = new Map<string, string>();
   if (p.names || out.unclear?.length) {
@@ -119,7 +122,7 @@ export async function runTally(piece: Piece, groupId: string, line: Line, reques
   const d = await tallyData(piece, groupId, line, requestId);
   if (d === 'empty') return noticeCard(title, `目前還沒有人登記${p.subject}。`);
   if (!d || d === 'quota') return d;
-  return noticeCard(title, tallyText(d.totals, p.subject, p.names, d.nameOf, d.unclear));
+  return noticeCard(title, tallyText(d.totals, p.subject, p.names, d.nameOf, d.unclear, p.measures ?? []));
 }
 
 
@@ -201,6 +204,11 @@ export async function runJob(name: string, orbs: Orb[], owner: string, line: Lin
     const card = await runTally(piece, to, line, `tally-close-${taipeiDay()}-${orb.slot}-${piece.id}`);
     if (!card || card === 'quota') return 'tally_failed';
     await line.push(owner, [noticeCard('⏰ 統計已截止', '以下是截止時的結果。'), card]);
+    return 'sent';
+  }
+  // 定時提醒 with a fixed sentence: sent as it is, no AI and no quota.
+  if (job.kind === 'push' && p.say) {
+    await line.push(to, [noticeCard('⏰ 提醒', String(p.say))]);
     return 'sent';
   }
   if (job.kind === 'push' && p.day) {

@@ -90,14 +90,14 @@ async function compose(mode: 'polish' | 'write' | 'ask', requestId: string, extr
   return { status: res?.status ?? 503, text: typeof data?.text === 'string' ? data.text : '' };
 }
 
-export async function aprDigest(requestId: string, messages: unknown[], focus = '') {
+export async function aprDigest(requestId: string, messages: unknown[], focus = '', sort = '') {
   const base = env('APRICO_URL'),
     key = await apricoKey();
   if (!base || !key) return { status: 503, digest: null };
   const res = await fetch(`${base}/digest`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requestId, messages, ...(focus ? { focus } : {}) }),
+    body: JSON.stringify({ requestId, messages, ...(focus ? { focus } : {}), ...(sort ? { sort } : {}) }),
     signal: AbortSignal.timeout(60000),
   }).catch(() => null);
   return { status: res?.status ?? 503, digest: res?.ok ? await res.json().catch(() => null) : null };

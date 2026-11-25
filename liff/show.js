@@ -41,9 +41,11 @@ export async function showView(h, show, call, slot) {
   function stats() {
     const out = [];
     const t = d.tally;
+    // A long description makes a poor title: keep the first few characters.
+    const subject = d.subject.length > 10 ? `${d.subject.slice(0, 10)}…` : d.subject;
     // Counting belongs to the two layouts that show it; the money layouts read saved records.
     if (d.canCount && (d.template === 'rank' || d.template === 'detail')) {
-      const btn = h('button', { class: 's-btn', type: 'button' }, t ? '重新統計' : `統計${d.subject}`);
+      const btn = h('button', { class: 's-btn', type: 'button' }, t ? '重新統計' : '開始統計');
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         btn.textContent = '統計中…';
@@ -56,13 +58,28 @@ export async function showView(h, show, call, slot) {
       if (d.template === 'rank') {
         const max = Math.max(1, ...t.items.map((i) => i.qty));
         const rows = [...t.items].sort((a, b) => b.qty - a.qty);
-        out.push(card(`${d.subject}數量排行`, `共 ${t.count} 人`, h('div', { class: 's-rank' }, rows.map((i) => h('div', {}, h('span', {}, i.name), h('i', { style: `width:${Math.max(6, (i.qty / max) * 100)}%` }), h('b', {}, String(i.qty)))))));
+        out.push(card(`${subject}・數量排行`, `共 ${t.count} 人`, h('div', { class: 's-rank' }, rows.map((i) => h('div', {}, h('span', {}, i.name), h('i', { style: `width:${Math.max(6, (i.qty / max) * 100)}%` }), h('b', {}, String(i.qty)))))));
       } else {
+        // Columns follow what this orb counts: estimated measures, and money only when priced.
+        const ms = d.measures ?? [];
+        const money = t.total > 0;
+        const cell = (v, unit) => h('td', {}, v ? `${Number(v).toLocaleString('en-US')}${unit || ''}` : '—');
         out.push(
           card(
-            `${d.subject}每人明細`,
+            `${subject}・每人明細`,
             `共 ${t.count} 人`,
-            h('table', { class: 's-table' }, h('tr', {}, h('th', {}, '誰'), h('th', {}, '內容'), h('th', {}, '金額')), t.people.map((p) => h('tr', {}, h('td', {}, p.who), h('td', {}, p.lines.join('、')), h('td', {}, p.amount ? String(p.amount) : '—'))), t.total ? h('tr', { class: 'sum' }, h('td', {}, '合計'), h('td', {}), h('td', {}, twd(t.total))) : null),
+            h(
+              'div',
+              { class: 's-scroll' },
+              h(
+                'table',
+                { class: 's-table' },
+                h('tr', {}, h('th', {}, '誰'), h('th', {}, '內容'), ms.map((m) => h('th', {}, m.name)), money ? h('th', {}, '金額') : null),
+                t.people.map((p) => h('tr', {}, h('td', {}, p.who), h('td', {}, p.lines.join('、')), ms.map((m, i) => cell(p.values?.[i], m.unit)), money ? cell(p.amount) : null)),
+                ms.length || money ? h('tr', { class: 'sum' }, h('td', {}, '合計'), h('td', {}), ms.map((m, i) => cell(t.sums?.[i], m.unit)), money ? h('td', {}, twd(t.total)) : null) : null,
+              ),
+            ),
+            ms.length ? h('p', { class: 's-note' }, '※ 估算值只憑文字推估，僅供參考。') : null,
           ),
         );
       }

@@ -89,7 +89,8 @@ export async function showData(orb: Orb, owner: string, line: Line, body: any, r
           count: d.totals.count,
           total: d.totals.total,
           items: d.totals.perItem.map(([name, qty]) => ({ name, qty })),
-          people: d.totals.people.map((p) => ({ who: d.nameOf(p.who), lines: p.lines, amount: p.amount })),
+          people: d.totals.people.map((p) => ({ who: d.nameOf(p.who), lines: p.lines, amount: p.amount, values: p.values })),
+          sums: d.totals.sums,
         };
     }
   }
@@ -97,6 +98,7 @@ export async function showData(orb: Orb, owner: string, line: Line, body: any, r
     ...head,
     subject: piece ? String((piece.params as any).subject) : '',
     canCount: Boolean(piece),
+    measures: piece ? (((piece.params as any).measures ?? []) as { name: string; unit: string }[]) : [],
     tally,
     tallyNote,
     money: await money(source),

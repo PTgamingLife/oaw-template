@@ -61,6 +61,8 @@ async function organise(owner: string, line: ReturnType<typeof lineClient>) {
       `digest-${today}-${src.slice(-10)}-${msgs[0].id}`,
       msgs.map((m) => ({ at: fmt(m.sent_at), who: m.is_owner ? 'owner' : 'friend', text: m.text })),
       String(pieceOf(orb, 'record')?.params?.topic ?? ''),
+      // 整理分類: the owner's wish for how things are sorted.
+      String(pieceOf(orb, 'organize')?.params?.how ?? ''),
     );
     if (status === 402) {
       if (await onceToday('quota'))

@@ -47,43 +47,50 @@ export function windowStart(open: string, now = Date.now()) {
   return new Date(`${day}T${open || '00:00'}:00+08:00`).toISOString();
 }
 
-export type TallyEntry = { who: string; item: string; qty: number; note: string; line: number };
+export type TallyEntry = { who: string; item: string; qty: number; note: string; line: number; values?: number[] };
 type Item = { name: string; price: number };
 
 /**
  * Apply entries in line order. dedupe 'last': a member's newest line replaces their earlier
  * ones (qty 0 cancels). 'sum': quantities add up per item (qty 0 clears that item).
  */
-export function tallyTotals(entries: TallyEntry[], items: Item[], dedupe: 'last' | 'sum') {
-  const byWho = new Map<string, Map<string, { qty: number; note: string }>>();
+export function tallyTotals(entries: TallyEntry[], items: Item[], dedupe: 'last' | 'sum', measures = 0) {
+  type Mine = { qty: number; note: string; values: number[] };
+  const zero = () => Array.from({ length: measures }, () => 0);
+  const vals = (e: TallyEntry) => zero().map((_, i) => Number(e.values?.[i]) || 0);
+  const byWho = new Map<string, Map<string, Mine>>();
   const lastLine = new Map<string, number>();
   for (const e of [...entries].sort((a, b) => a.line - b.line)) {
-    let mine = byWho.get(e.who) ?? new Map();
+    let mine = byWho.get(e.who) ?? new Map<string, Mine>();
     if (dedupe === 'last' && lastLine.get(e.who) !== e.line) mine = new Map();
     lastLine.set(e.who, e.line);
+    const had = mine.get(e.item);
     if (e.qty === 0) mine.delete(e.item);
-    else if (dedupe === 'sum' && mine.has(e.item))
-      mine.set(e.item, { qty: mine.get(e.item)!.qty + e.qty, note: e.note || mine.get(e.item)!.note });
-    else mine.set(e.item, { qty: e.qty, note: e.note });
+    else if (dedupe === 'sum' && had)
+      mine.set(e.item, { qty: had.qty + e.qty, note: e.note || had.note, values: had.values.map((v, i) => v + vals(e)[i]) });
+    else mine.set(e.item, { qty: e.qty, note: e.note, values: vals(e) });
     byWho.set(e.who, mine);
   }
   const price = new Map(items.map((i) => [i.name, i.price]));
   const perItem = new Map<string, number>();
-  const people: { who: string; lines: string[]; amount: number }[] = [];
+  const people: { who: string; lines: string[]; amount: number; values: number[] }[] = [];
   let total = 0;
+  const sums = zero();
   for (const [who, mine] of byWho) {
     if (!mine.size) continue;
     let amount = 0;
     const lines: string[] = [];
+    const own = zero();
     for (const [item, v] of mine) {
       perItem.set(item, (perItem.get(item) ?? 0) + v.qty);
       amount += (price.get(item) ?? 0) * v.qty;
+      v.values.forEach((x, i) => ((own[i] += x), (sums[i] += x)));
       lines.push(`${item}×${v.qty}${v.note ? `（${v.note}）` : ''}`);
     }
     total += amount;
-    people.push({ who, lines, amount });
+    people.push({ who, lines, amount, values: own.map((x) => Math.round(x)) });
   }
-  return { perItem: [...perItem.entries()], people, total, count: people.length };
+  return { perItem: [...perItem.entries()], people, total, count: people.length, sums: sums.map((x) => Math.round(x)) };
 }
 
 /** Card text for a tally. `nameOf` turns a speaker label back into a display name. */
@@ -93,18 +100,22 @@ export function tallyText(
   showNames: boolean,
   nameOf: (label: string) => string,
   unclear: { who: string; text: string }[] = [],
+  measures: { name: string; unit: string }[] = [],
 ) {
   if (!t.count) return `目前還沒有人登記${subject}。`;
   const out = [`共 ${t.count} 人`, ...t.perItem.map(([item, qty]) => `・${item}：${qty}`)];
   if (t.total) out.push(`合計 ${t.total} 元`);
+  const est = (values: number[]) => measures.map((m, i) => `${m.name} ${values[i] ?? 0}${m.unit}`).join('、');
+  if (measures.length) out.push(`估算合計：${est(t.sums)}`);
   if (showNames) {
     out.push('', '明細');
     for (const p of t.people)
-      out.push(`${nameOf(p.who)}：${p.lines.join('、')}${p.amount ? ` ${p.amount} 元` : ''}`);
+      out.push(`${nameOf(p.who)}：${p.lines.join('、')}${p.amount ? ` ${p.amount} 元` : ''}${measures.length ? `（${est(p.values)}）` : ''}`);
   }
   if (unclear.length) {
     out.push('', '看不懂的訊息（請本人再說一次）');
     for (const u of unclear.slice(0, 5)) out.push(`${nameOf(u.who)}：${u.text}`);
   }
+  if (measures.length) out.push('', '※ 估算值只憑文字推估，僅供參考。');
   return out.join('\n').slice(0, 1900);
 }
