@@ -177,7 +177,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           `找不到「${want.asked}」`,
           want.names?.length
             ? `目前連結的帳號：${want.names.join('、')}`
-            : '還沒有連結其他帳號。到「打開秘書」→「更多設定」→「跨帳號連結」建立。',
+            : '還沒有連結其他帳號。跨帳號連結功能開通中，敬請期待。',
         ),
       ));
   }

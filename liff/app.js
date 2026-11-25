@@ -154,56 +154,6 @@ async function adminView(me) {
   );
 }
 
-const exampleFor = (data, tpl) =>
-  data.examples.find((e) => e.id === (data.view === 'interface' ? 'interface' : tpl.id)) ??
-  data.examples[0];
-
-function examplePanel(data, tpl) {
-  const ex = exampleFor(data, tpl);
-  return h(
-    'div',
-    { class: 'panel' },
-    h('img', { class: 'shot', src: `assets/examples/${ex.id}.jpg`, alt: `${ex.label}範例畫面` }),
-    h(
-      'div',
-      { class: 'chat' },
-      h('div', { class: 'me' }, ex.chat[0]),
-      h('div', { class: 'bot' }, ex.chat[1]),
-    ),
-    h('p', {}, ex.benefit),
-    h('p', { class: 'fee' }, ex.fee),
-    h(
-      'a',
-      { class: 'btn brand', href: data.subscribeUrl, target: '_blank', rel: 'noreferrer' },
-      `訂閱月費 ${data.fee}`,
-    ),
-  );
-}
-
-function tutorialPanel(data, tpl) {
-  const send = h('button', { class: 'btn brand', type: 'button' }, '送出設定句子');
-  send.addEventListener('click', async () => {
-    try {
-      await liff.sendMessages([{ type: 'text', text: tpl.command }]);
-      liff.closeWindow();
-    } catch {
-      await navigator.clipboard?.writeText(tpl.command).catch(() => {});
-      send.textContent = '已複製，請回到聊天室貼上送出';
-    }
-  });
-  return h(
-    'div',
-    { class: 'panel' },
-    h(
-      'ol',
-      {},
-      data.tutorial.map((t) => h('li', {}, t)),
-    ),
-    h('div', { class: 'cmd' }, tpl.command),
-    send,
-  );
-}
-
 /** Users see percentages only; the extra bar (grace + top-up) shows sale-price NT$. */
 function quotaBars(data) {
   const bar = (label, value, pct) =>
@@ -224,87 +174,71 @@ function quotaBars(data) {
   );
 }
 
+// Calendar subscription: one-way (秘書 → 行事曆); Google refreshes it a few times a day.
+function calendarCard() {
+  const out = h('div', {});
+  const open = async (action) => {
+    out.replaceChildren(h('p', { class: 'muted' }, '準備連結…'));
+    try {
+      const r = await call(action);
+      const link = (label, href) => h('a', { class: 'btn', href, target: '_blank', rel: 'noopener' }, label);
+      const again = h('button', { class: 'btn', type: 'button' }, '重新產生連結（舊連結失效）');
+      again.addEventListener('click', () => open('ics_reset'));
+      out.replaceChildren(link('加入 Google 行事曆', r.google), link('加入 iPhone／Mac 行事曆', r.apple), again);
+    } catch (e) {
+      const msg = e.message === 'pin_cancelled' ? '' : securityMessage(e.message);
+      out.replaceChildren(msg ? h('p', { class: 'error' }, msg) : start);
+    }
+  };
+  const start = h('button', { class: 'btn', type: 'button' }, '取得訂閱連結');
+  start.addEventListener('click', () => open('ics_link'));
+  out.append(start);
+  return h(
+    'section',
+    { class: 'card' },
+    h('h3', {}, '📅 加入 Google／iPhone 行事曆'),
+    h(
+      'p',
+      { class: 'muted' },
+      '訂閱後，秘書記下的行程會出現在你的行事曆（單向同步）。Google 行事曆大約半天到一天更新一次。這個連結等於鑰匙，請不要分享給別人。',
+    ),
+    out,
+  );
+}
+
+// 更多設定. 秘書設定: only what the orb page does not cover — quota, cross-account links,
+// the PIN. 介面設定: changing the look belongs to the 領航者版 and is not open yet.
 async function settingsView(view) {
   document.body.classList.add('brand');
-  const data = await call('settings', { view });
-  const tab = (v, label) =>
-    h('a', { href: `?view=${v}`, class: v === data.view ? 'on' : '' }, label);
-  const cards = data.templates.map((tpl) => {
-    const card = h(
-      'section',
-      { class: 'card tpl' },
-      h('h3', {}, tpl.label),
-      tpl.detail ? h('p', {}, tpl.detail) : null,
-    );
-    const start = h(
-      'button',
-      { class: 'btn', type: 'button' },
-      data.paid ? '開始設定' : '看使用範例',
-    );
-    start.addEventListener('click', () => {
-      card.querySelector('.panel')?.remove();
-      card.append(data.paid ? tutorialPanel(data, tpl) : examplePanel(data, tpl));
-    });
-    card.append(start);
-    return card;
-  });
+  const face = view === 'interface';
+  const data = face ? null : await call('settings', { view: 'secretary' });
+  const tab = (v, label) => h('a', { href: `?view=${v}`, class: (v === 'interface') === face ? 'on' : '' }, label);
   show(
-    h(
-      'div',
-      { class: 'brand-head' },
-      h('img', { src: 'assets/aprico-mark.png', alt: '' }),
-      h('strong', {}, 'Aprico AI 秘書'),
-    ),
-    h(
-      'nav',
-      { class: 'tabs' },
-      tab('secretary', '秘書設定'),
-      tab('interface', '介面設定'),
-    ),
-    data.paid
-      ? quotaBars(data)
-      : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}，訂閱後才能開始設定`),
-    ...cards,
-    data.view === 'secretary'
-      ? h(
-          'section',
-          { class: 'card' },
-          h('h3', {}, '✨ 我的 AI 秘書'),
+    h('a', { class: 'back', href: '?view=orbs' }, '← 回我的 AI 秘書'),
+    h('h1', {}, '更多設定'),
+    h('nav', { class: 'tabs' }, tab('secretary', '秘書設定'), tab('interface', '介面設定')),
+    ...(face
+      ? [
           h(
-            'p',
-            { class: 'muted' },
-            '三顆光球，每顆管一個對話（個人或群組）。放上拼圖，設定要記錄、整理、提醒或統計什麼。',
+            'section',
+            { class: 'card' },
+            h('h3', {}, '🎨 介面設計'),
+            h('p', { class: 'muted' }, '自訂選單、配色與卡片樣式。'),
+            h('button', { class: 'btn', type: 'button', disabled: '' }, '高階領航者版 開通就可以使用'),
           ),
-          h('a', { class: 'btn primary', href: '?view=orbs' }, '打開光球設定'),
-        )
-      : null,
-    data.view === 'secretary'
-      ? h(
-          'section',
-          { class: 'card' },
-          h('h3', {}, '🔗 跨帳號連結'),
+        ]
+      : [
+          data.paid ? quotaBars(data) : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}`),
           h(
-            'p',
-            { class: 'muted' },
-            '和其他官方帳號（例如其他部門）互傳指定資訊，雙方都同意才會連結。',
+            'section',
+            { class: 'card' },
+            h('h3', {}, '🔗 跨帳號連結'),
+            h('p', { class: 'muted' }, '和其他官方帳號互傳指定資訊，雙方都同意才會連結。'),
+            h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
           ),
-          h('a', { class: 'btn', href: '?view=links' }, '管理連結'),
-        )
-      : null,
-    data.view === 'secretary'
-      ? h(
-          'section',
-          { class: 'card' },
-          h('h3', {}, '👥 我的群組'),
-          h(
-            'p',
-            { class: 'muted' },
-            '群組裡叫 AI 整理、查行程、記事；在一對一聊天輸入「發到群組：內容」發公告。',
-          ),
-          h('a', { class: 'btn', href: '?view=groups' }, '管理群組'),
-        )
-      : null,
-    data.view === 'secretary' ? await securitySection(h, call) : null,
+          calendarCard(),
+          await securitySection(h, call),
+        ]),
   );
 }
 

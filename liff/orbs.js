@@ -199,13 +199,10 @@ export async function orbsView(h, show, call) {
     };
     moodTimer = setInterval(mood, 4200);
     img.addEventListener('click', mood);
-    const menuBtn = h('button', { class: 'btn3d ghost small', type: 'button' }, '更新 LINE 選單');
+    const menuBtn = h('button', { class: 'btn3d ghost small', type: 'button' }, '更新 LINE 選單介面');
     menuBtn.addEventListener('click', () => publishMenu(false));
     const more = h('a', { class: 'btn3d ghost small', href: '?view=secretary' }, '更多設定');
-    const openCal = h('a', { class: 'btn3d small', href: '?view=calendar' }, '📅 打開行事曆');
     const design = state.plan === 'navigator' ? h('a', { class: 'btn3d ghost small', href: '?view=design' }, '🎨 介面設計中心') : null;
-    const cal = h('button', { class: 'btn3d ghost small', type: 'button' }, '📅 加入 Google／iPhone 行事曆');
-    cal.addEventListener('click', () => calendarSheet('ics_link'));
     stage.replaceChildren(
       h(
         'section',
@@ -223,21 +220,9 @@ export async function orbsView(h, show, call) {
             h('div', { class: 'cell' }, '打開秘書'),
             state.buttons.map((w) => h('div', { class: 'cell' + (w ? '' : ' empty') }, w || '未設定')),
           ),
-          h('div', { class: 'tools' }, openCal, cal, state.plan === 'navigator' ? design : menuBtn, more),
+          h('div', { class: 'tools' }, state.plan === 'navigator' ? design : menuBtn, more),
         ),
       ),
-    );
-  }
-  // Calendar subscription: one-way (秘書 → 行事曆); Google refreshes it a few times a day.
-  async function calendarSheet(action) {
-    const r = await server(action, {}, '準備連結…');
-    if (!r?.feed) return;
-    const link = (label, href, cls) => h('a', { class: 'btn3d ' + cls, href, target: '_blank', rel: 'noopener' }, label);
-    sheet(
-      '把行程放進行事曆',
-      '訂閱後，秘書記下的行程會出現在你的行事曆（單向同步）。Google 行事曆大約半天到一天更新一次。這個連結等於鑰匙，請不要分享給別人。',
-      [['重新產生連結（舊連結失效）', () => calendarSheet('ics_reset'), 'ghost'], ['關閉', null, 'ghost']],
-      [link('加入 Google 行事曆', r.google, ''), link('加入 iPhone／Mac 行事曆', r.apple, 'ghost')],
     );
   }
   function orbSheet(o) {
