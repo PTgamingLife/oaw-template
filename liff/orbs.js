@@ -432,7 +432,7 @@ export async function orbsView(h, show, call) {
     dirty = false;
     plane();
     const first = r.issues[0];
-    if (!first) return summary(r.note);
+    if (!first) return summary(r.note, r.does);
     const more = r.issues.length > 1 ? `（還有 ${r.issues.length - 1} 項）` : '';
     const box = h('div', { class: 'issue' }, first.text);
     const piece = cur.pieces.find((p) => p.id === first.piece);
@@ -459,12 +459,16 @@ export async function orbsView(h, show, call) {
       ], [box], true);
     sheet('還差一步', null, [['知道了', null]], [box], true);
   }
-  function summary(note) {
+  function summary(note, does = []) {
     const linked = new Set(cur.links.flat());
     const alone = cur.pieces.filter((p) => cur.pieces.length > 1 && !linked.has(p.id)).map((p) => TYPES[p.type][0]);
-    const list = h('ul', {}, cur.pieces.map((p) => h('li', {}, `${TYPES[p.type][0]}：${p.text}`)));
+    // Under each piece: what it will really do, written by the program from its settings.
+    const real = new Map(does.map((d) => [d.id, d.text]));
+    const list = h('ul', {}, cur.pieces.map((p) => h('li', {}, h('b', {}, TYPES[p.type][0]), `：${p.text}`, real.get(p.id) ? h('small', {}, `實際會做：${real.get(p.id)}`) : null)));
+    // The AI must say what it cannot do; show that part where it cannot be missed.
+    const cannot = /做不到/.test(note || '');
     const slot = cur.slot;
-    sheet('AI 整理好了', note || null, [
+    sheet(cannot ? 'AI 整理好了，但有做不到的部分' : 'AI 整理好了', cannot ? null : note || null, [
       [cur.on ? '更新光球' : '啟動光球', async () => {
         const r = await server('orb_toggle', { slot, on: true });
         if (!r) return;
@@ -473,7 +477,7 @@ export async function orbsView(h, show, call) {
         if (r.timed === false) notice('光球已啟動', '定時功能（定時提醒、統計截止）暫時無法排程，其他功能正常。請稍後再開關一次光球，或聯絡專員。');
       }],
       ['再調整', null, 'ghost'],
-    ], [h('div', { class: 'good' }, list), alone.length ? h('p', {}, `「${alone.join('、')}」沒有和其他拼圖連結，會各自獨立運作。`) : null], true);
+    ], [cannot ? h('div', { class: 'issue' }, note) : null, h('div', { class: 'good' }, list), alone.length ? h('p', {}, `「${alone.join('、')}」沒有和其他拼圖連結，會各自獨立運作。`) : null], true);
   }
 
   window.addEventListener('resize', () => cur && lines());

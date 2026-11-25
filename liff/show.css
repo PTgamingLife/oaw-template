@@ -54,3 +54,5 @@ body.show-mode main { max-width: none; padding: 0; margin: 0; }
 #show-stage .s-line i { width: 12px; height: 12px; border-radius: 50%; background: #7c8cf0; margin-top: 3px; position: relative; z-index: 1; }
 #show-stage .s-line time { color: var(--soft); font-size: 12px; padding-top: 1px; }
 #show-stage button:focus-visible, #show-stage a:focus-visible { outline: 3px solid var(--deep); outline-offset: 2px; }
+#show-stage .s-scroll { overflow-x: auto; }
+#show-stage .s-table td:not(:first-child):not(:nth-child(2)), #show-stage .s-table th:not(:first-child):not(:nth-child(2)) { text-align: right; white-space: nowrap; }

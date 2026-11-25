@@ -67,7 +67,9 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
     case 'record':
       return { topic: str(p.topic, 60) }; // '' = keep everything
     case 'organize':
-      return { as: pick(p.as, VIEWS, 'calendar') };
+      // how: the owner's wish for sorting, passed to the nightly run (it still files things
+      // as events, expenses, todos and life notes).
+      return { as: pick(p.as, VIEWS, 'summary'), how: str(p.how, 80) };
     case 'command': {
       // The owner's cue: the word alone shows this orb's page; the word followed by a
       // request hands that request to the AI.
@@ -77,8 +79,14 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
     case 'push': {
       // day set = that day's events (what the old 提醒 piece did); otherwise `show`.
       const time = hhmm(p.time);
+      // Sends exactly one thing: `say` (a fixed sentence), else that `day`'s events, else `show`.
       return time
-        ? { time, show: pick(p.show, VIEWS, 'calendar'), day: pick(p.day, ['', 'today', 'tomorrow'] as const, '') }
+        ? {
+            time,
+            show: pick(p.show, VIEWS, 'calendar'),
+            day: pick(p.day, ['', 'today', 'tomorrow'] as const, ''),
+            say: str(p.say, 200),
+          }
         : null;
     }
     case 'stats': {
@@ -94,6 +102,11 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
       return {
         subject,
         items,
+        // Numbers the AI estimates for each entry (e.g. 熱量 kcal); the app adds them up.
+        measures: (Array.isArray(p.measures) ? p.measures : [])
+          .map((m: any) => ({ name: str(m?.name, 8), unit: str(m?.unit, 6) }))
+          .filter((m: { name: string }) => m.name)
+          .slice(0, 3),
         open: hhmm(p.open),
         close: hhmm(p.close),
         dedupe: pick(p.dedupe, ['last', 'sum'] as const, 'last'),
@@ -239,6 +252,42 @@ export function defaultOrbs(): Orb[] {
     { slot: 2, name: '光球 2', on: false, target: '', face: '', template: '', persona: '', pieces: [], links: [] },
     { slot: 3, name: '光球 3', on: false, target: '', face: '', template: '', persona: '', pieces: [], links: [] },
   ];
+}
+
+/**
+ * What a confirmed piece will really do, written from its settings (not from the owner's or
+ * the AI's wording), so the two can be compared before the orb is lit.
+ */
+export function explainPiece(p: Piece, orb: Pick<Orb, 'target' | 'face'>): string {
+  const v = (p.params ?? {}) as any;
+  if (!p.params) return '還沒有設定完成。';
+  switch (p.type) {
+    case 'record':
+      return v.topic ? `只記下和「${v.topic}」有關的內容。` : '記下這個對話裡的所有文字訊息。';
+    case 'organize':
+      return `每晚 9 點整理成行程、記帳、待辦、生活四類${v.how ? `，並參考你的分類方式「${v.how}」` : ''}。`;
+    case 'command':
+      return `只說「${v.word}」會顯示這顆光球的介面；「${v.word}」後面接問題，AI 會回答（還不能代你新增或修改資料）。`;
+    case 'push':
+      return v.say
+        ? `每天 ${v.time} 傳這句話：「${v.say}」。`
+        : v.day
+          ? `每天 ${v.time} 傳${v.day === 'tomorrow' ? '明天' : '今天'}的行程（沒有行程就不傳）。`
+          : `每天 ${v.time} 傳${{ calendar: '接下來 7 天的行程', list: '待辦清單', summary: '行程和待辦的整理', stats: '統計結果' }[v.show as string] ?? '整理'}（沒有內容就不傳）。`;
+    case 'stats': {
+      const window = v.open || v.close ? `每天 ${v.open || '00:00'}${v.close ? ` 到 ${v.close}` : ' 起'}` : '當天';
+      const what = v.measures?.length
+        ? `，並由 AI 估算每一筆的${v.measures.map((m: any) => `${m.name}（${m.unit || '數值'}）`).join('、')}`
+        : v.items?.some((i: any) => i.price)
+          ? '，並依價格算出金額'
+          : '';
+      return `統計${window}的「${v.subject}」：誰、什麼、幾份${what}。同一個人${v.dedupe === 'sum' ? '多次登記會加總' : '以最後一次為準'}。說「${v.word}」或在顯示頁按按鈕才會統計${v.close ? `，${v.close} 截止時會私訊結果給你` : ''}。${v.measures?.length ? '估算值只憑文字推估，僅供參考。' : ''}`;
+    }
+    case 'announce':
+      return '你在個人對話說「發到群組：內容」，秘書會把內容發到這個群組。';
+    case 'answer':
+      return '這個對話的每一則訊息都會回覆（每天最多 60 次，會用到 AI 額度）；只是交辦時回得很短。';
+  }
 }
 
 export type Issue = { piece: number | null; code: string; text: string };

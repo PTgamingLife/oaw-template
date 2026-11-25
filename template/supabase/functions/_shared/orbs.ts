@@ -7,6 +7,7 @@ import {
   cleanParams,
   cleanPlan,
   cleanTemplate,
+  explainPiece,
   FACES,
   defaultOrbs,
   localIssues,
@@ -193,5 +194,7 @@ export async function orbAction(action: string, body: any, requestId: string) {
   await put({ ...orb, on: orb.on && !issues.length });
   await syncCron(orbs);
   // `proposal`: pieces the AI suggests adding or removing; shown to the owner, applied only on agreement.
-  return { ...(await view(orbs)), issues, note, ready: !issues.length, proposal: plan };
+  // `does`: what each piece will really do, written from its settings (not the AI's wording).
+  const does = orb.pieces.map((p) => ({ id: p.id, text: explainPiece(p, orb) }));
+  return { ...(await view(orbs)), issues, note, ready: !issues.length, proposal: plan, does };
 }

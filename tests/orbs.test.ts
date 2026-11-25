@@ -21,7 +21,7 @@ test('a new account has orb 1 lit, ready, and one menu button from its 指令 pi
 
 test('piece params are cleaned and required values are enforced', () => {
   assert.equal(cleanParams('push', { time: '9點', show: 'calendar' }), null);
-  assert.deepEqual(cleanParams('push', { time: '21:00', show: 'hack' }), { time: '21:00', show: 'calendar', day: '' });
+  assert.deepEqual(cleanParams('push', { time: '21:00', show: 'hack' }), { time: '21:00', show: 'calendar', day: '', say: '' });
   assert.equal(cleanParams('push', { time: '07:00', day: 'tomorrow' })?.day, 'tomorrow');
   assert.equal(cleanParams('command', { word: ' ' }), null);
   assert.deepEqual(cleanParams('command', { word: '行 事 曆', show: 'list' }), { word: '行事曆', show: 'list' });
@@ -161,7 +161,7 @@ test('顯示介面: one face per orb, layouts limited to the list, old orbs upgr
   );
   assert.equal(old.face, 'calendar');
   assert.deepEqual(old.pieces.map((p) => p.type), ['organize', 'push', 'command']);
-  assert.deepEqual(old.pieces[1].params, { time: '07:00', show: 'calendar', day: 'today' });
+  assert.deepEqual(old.pieces[1].params, { time: '07:00', show: 'calendar', day: 'today', say: '' });
   assert.equal(old.pieces[2].params?.word, '小秘');
 });
 
@@ -204,4 +204,36 @@ test('AI proposals are limited to what the orb may hold, and applying one never 
   assert.equal(built.template, 'rank');
   assert.deepEqual(built.pieces.map((p) => p.type), ['record', 'stats']);
   assert.deepEqual(built.links, [[1, 2]]);
+});
+
+test('what a piece really does is written from its settings, and measures are added up', async () => {
+  const { explainPiece } = await import('../template/supabase/functions/_shared/orb-model.ts');
+  const piece = (type: any, params: any) => ({ id: 1, type, text: 'x', x: 0.5, y: 0.5, params: cleanParams(type, params) });
+  const orb = { target: 'C1', face: 'stats' as const };
+  assert.match(explainPiece(piece('push', { time: '08:00', say: '記得喝水' }), orb), /每天 08:00 傳這句話：「記得喝水」/);
+  assert.match(explainPiece(piece('push', { time: '07:00', day: 'today' }), orb), /今天的行程/);
+  assert.match(explainPiece(piece('organize', { how: '依客戶分類' }), orb), /四類，並參考你的分類方式「依客戶分類」/);
+  const stats = piece('stats', { subject: '飲食', measures: [{ name: '熱量', unit: 'kcal' }, { name: '', unit: 'g' }, { name: '蛋白質', unit: 'g' }], dedupe: 'sum' });
+  assert.deepEqual(stats.params?.measures, [{ name: '熱量', unit: 'kcal' }, { name: '蛋白質', unit: 'g' }]);
+  assert.match(explainPiece(stats, orb), /由 AI 估算每一筆的熱量（kcal）、蛋白質（g）.*會加總.*僅供參考/);
+  assert.equal(explainPiece({ ...stats, params: null }, orb), '還沒有設定完成。');
+  // Two meals by one member add up; another member is separate.
+  const t = tallyTotals(
+    [
+      { who: 'M1', item: '雞腿便當', qty: 1, note: '', line: 1, values: [780, 35] },
+      { who: 'M1', item: '豆漿', qty: 1, note: '', line: 2, values: [120, 7] },
+      { who: 'M2', item: '排骨飯', qty: 1, note: '', line: 3, values: [820, 30] },
+    ],
+    [],
+    'sum',
+    2,
+  );
+  assert.deepEqual(t.people.map((p) => p.values), [[900, 42], [820, 30]]);
+  assert.deepEqual(t.sums, [1720, 72]);
+  const text = tallyText(t, '飲食', true, (l) => l, [], [{ name: '熱量', unit: 'kcal' }, { name: '蛋白質', unit: 'g' }]);
+  assert.match(text, /估算合計：熱量 1720kcal、蛋白質 72g/);
+  assert.match(text, /M1：.*（熱量 900kcal、蛋白質 42g）/);
+  assert.match(text, /僅供參考/);
+  // Without measures nothing about estimates appears.
+  assert.doesNotMatch(tallyText(tallyTotals([{ who: 'M1', item: '雞腿', qty: 1, note: '', line: 1 }], [], 'last'), '便當', true, (l) => l), /估算/);
 });
