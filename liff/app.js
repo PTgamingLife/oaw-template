@@ -171,6 +171,27 @@ function quotaBars(data) {
       ? bar('加值額度', `剩 NT$${data.extraTwdLeft}`, Math.min(100, (data.extraTwdLeft / 50) * 100))
       : null,
     data.paidUntil ? h('p', { class: 'muted' }, `訂閱到 ${data.paidUntil}`) : null,
+    data.topupUrl ? h('a', { class: 'btn', href: data.topupUrl }, '前往加值') : null,
+  );
+}
+
+/** 版本: what this app runs (liff/version.json ships with the template) and the newest release. */
+async function versionCard(data) {
+  const mine = await fetch('version.json', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((v) => (typeof v?.version === 'string' ? v.version : ''))
+    .catch(() => '');
+  const latest = data.latest || '';
+  const behind = Boolean(mine && latest && mine !== latest);
+  const state = !latest ? '暫時讀不到最新版本。' : !mine ? '這個帳號是較早的版本，建議更新。' : behind ? '有新版本可以更新。' : '已經是最新版本。';
+  return h(
+    'section',
+    { class: 'card' },
+    h('h3', {}, '⬆️ 版本'),
+    h('div', { class: 'quota-row' }, h('span', {}, '目前版本'), h('strong', {}, mine || '較早的版本')),
+    h('div', { class: 'quota-row' }, h('span', {}, '最新版本'), h('strong', {}, latest || '—')),
+    h('p', { class: 'muted' }, state),
+    data.updateUrl ? h('a', { class: 'btn' + (behind || !mine ? ' primary' : ''), href: data.updateUrl }, behind || !mine ? '前往更新' : '檢查更新') : null,
   );
 }
 
@@ -237,6 +258,7 @@ async function settingsView(view) {
             h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
           ),
           calendarCard(),
+          await versionCard(data),
           await securitySection(h, call),
         ]),
   );

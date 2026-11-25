@@ -80,9 +80,9 @@ h1 {
   text-decoration: none;
 }
 .btn.primary {
-  background: #2b2b2b;
+  background: linear-gradient(180deg, #9aa7ff, #5866d6);
   color: #fff;
-  border-color: #2b2b2b;
+  border-color: #5866d6;
 }
 .btn:disabled {
   opacity: 0.5;
