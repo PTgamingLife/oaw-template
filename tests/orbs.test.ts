@@ -168,9 +168,9 @@ test('顯示介面: one face per orb, layouts limited to the list, old orbs upgr
 test('a recorded line is acknowledged with 「收到」 in one of ten languages plus Chinese', async () => {
   const { GOT_IT, gotIt } = await import('../template/supabase/functions/_shared/persona.ts');
   assert.equal(new Set(GOT_IT).size, 10);
-  assert.equal(gotIt(0), 'Got it! 收到');
-  assert.equal(gotIt(0.999), 'Recebido! 收到');
-  assert.equal(gotIt(1), 'Recebido! 收到'); // never out of range
+  assert.equal(gotIt(0), 'Got it!（收到）');
+  assert.equal(gotIt(0.999), 'Recebido!（收到）');
+  assert.equal(gotIt(1), 'Recebido!（收到）'); // never out of range
 });
 
 test('AI proposals are limited to what the orb may hold, and applying one never lights the orb', async () => {

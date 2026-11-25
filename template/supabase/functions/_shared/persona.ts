@@ -44,4 +44,4 @@ export const GOT_IT = [
 ];
 /** Card title for a recorded line: one foreign 「收到」 plus the Chinese one. */
 export const gotIt = (pick = Math.random()) =>
-  `${GOT_IT[Math.min(GOT_IT.length - 1, Math.floor(pick * GOT_IT.length))]} 收到`;
+  `${GOT_IT[Math.min(GOT_IT.length - 1, Math.floor(pick * GOT_IT.length))]}（收到）`;
