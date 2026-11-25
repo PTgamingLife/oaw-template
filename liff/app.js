@@ -174,24 +174,38 @@ function quotaBars(data) {
   );
 }
 
-// 更多設定: only what the orb page does not cover — quota, cross-account links, the PIN.
-async function settingsView() {
+// 更多設定. 秘書設定: only what the orb page does not cover — quota, cross-account links,
+// the PIN. 介面設定: changing the look belongs to the 領航者版 and is not open yet.
+async function settingsView(view) {
   document.body.classList.add('brand');
-  const data = await call('settings', { view: 'secretary' });
+  const face = view === 'interface';
+  const data = face ? null : await call('settings', { view: 'secretary' });
+  const tab = (v, label) => h('a', { href: `?view=${v}`, class: (v === 'interface') === face ? 'on' : '' }, label);
   show(
     h('a', { class: 'back', href: '?view=orbs' }, '← 回我的 AI 秘書'),
     h('h1', {}, '更多設定'),
-    data.paid
-      ? quotaBars(data)
-      : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}`),
-    h(
-      'section',
-      { class: 'card' },
-      h('h3', {}, '🔗 跨帳號連結'),
-      h('p', { class: 'muted' }, '和其他官方帳號互傳指定資訊，雙方都同意才會連結。'),
-      h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
-    ),
-    await securitySection(h, call),
+    h('nav', { class: 'tabs' }, tab('secretary', '秘書設定'), tab('interface', '介面設定')),
+    ...(face
+      ? [
+          h(
+            'section',
+            { class: 'card' },
+            h('h3', {}, '🎨 介面設計'),
+            h('p', { class: 'muted' }, '自訂選單、配色與卡片樣式。'),
+            h('button', { class: 'btn', type: 'button', disabled: '' }, '高階領航者版 開通就可以使用'),
+          ),
+        ]
+      : [
+          data.paid ? quotaBars(data) : h('span', { class: 'chip' }, `尚未訂閱・月費 ${data.fee}`),
+          h(
+            'section',
+            { class: 'card' },
+            h('h3', {}, '🔗 跨帳號連結'),
+            h('p', { class: 'muted' }, '和其他官方帳號互傳指定資訊，雙方都同意才會連結。'),
+            h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
+          ),
+          await securitySection(h, call),
+        ]),
   );
 }
 
@@ -232,7 +246,7 @@ async function main() {
     return (await import('./health.js')).healthView({ h, show, call }, params);
   if (['secretary', 'interface'].includes(params.get('view'))) {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以進入設定。');
-    return settingsView();
+    return settingsView(params.get('view'));
   }
   const index = Number(params.get('cell'));
   const cell = params.has('cell') ? me.config.cells[index] : null;

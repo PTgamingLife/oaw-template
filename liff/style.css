@@ -126,20 +126,21 @@ body.brand {
   text-align: center;
   padding: 10px;
   border-radius: 12px;
-  background: #efe3d6;
+  background: #e4e8ff;
   color: var(--text);
   text-decoration: none;
   font-weight: 600;
 }
 .tabs a.on {
-  background: var(--accent);
+  background: linear-gradient(180deg, #9aa7ff, #5866d6);
+  color: #fff;
 }
 .chip {
   display: inline-block;
   font-size: 13px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #efe3d6;
+  background: #e4e8ff;
   margin-bottom: 14px;
 }
 .chip.paid {
@@ -172,7 +173,7 @@ body.brand {
 }
 .chat .me {
   justify-self: end;
-  background: #efe3d6;
+  background: #e4e8ff;
 }
 .chat .bot {
   justify-self: start;
