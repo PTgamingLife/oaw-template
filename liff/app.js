@@ -259,6 +259,10 @@ async function main() {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以設定 AI 秘書。');
     return (await import('./orbs.js')).orbsView(h, show, call);
   }
+  if (params.get('view') === 'show') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以打開這個頁面。');
+    return (await import('./show.js')).showView(h, show, call, Number(params.get('slot')));
+  }
   if (params.get('view') === 'design') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以使用介面設計中心。');
     return (await import('./design.js')).designView(h, show, call, drawMenu, menuAreas);

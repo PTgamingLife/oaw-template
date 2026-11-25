@@ -3,28 +3,35 @@
 // words; Aprico's AI turns the words into `params` (never code). This file is pure: shapes,
 // validation, the default orb, local checks and the menu buttons. Testable with Node.
 
-export const PIECE_TYPES = [
-  'record',
-  'organize',
-  'command',
-  'push',
-  'remind',
-  'stats',
-  'announce',
-  'answer',
-] as const;
+export const PIECE_TYPES = ['record', 'organize', 'command', 'push', 'stats', 'announce', 'answer'] as const;
 export type PieceType = (typeof PIECE_TYPES)[number];
 export const PIECE_NAME: Record<PieceType, string> = {
   record: '紀錄',
   organize: '整理',
   command: '指令',
-  push: '定時推播',
-  remind: '提醒',
+  push: '定時提醒',
   stats: '統計',
   announce: '公告',
   answer: '回答',
 };
 export const VIEWS = ['calendar', 'list', 'summary', 'stats'] as const;
+
+/**
+ * 顯示介面: the one page an orb opens from the LINE menu, and the layouts it may use. The AI
+ * (or the owner, in plain words) picks a layout; nothing outside this list can be shown.
+ */
+export const FACES = {
+  calendar: ['month'],
+  stats: ['rank', 'detail', 'trend', 'total'],
+  notes: ['list', 'todo', 'wall', 'timeline'],
+} as const;
+export type Face = keyof typeof FACES;
+export const FACE_NAME: Record<Face, string> = { calendar: '行事曆', stats: '統計圖表', notes: '備註記事' };
+export const cleanFace = (v: unknown): Face | '' => (typeof v === 'string' && v in FACES ? (v as Face) : '');
+/** A layout of that face, or the face's first one. */
+export const cleanTemplate = (face: Face | '', v: unknown) =>
+  !face ? '' : (FACES[face] as readonly string[]).includes(v as string) ? (v as string) : FACES[face][0];
+export const PERSONA_MAX = 800;
 
 export type Piece = {
   id: number;
@@ -39,6 +46,9 @@ export type Orb = {
   name: string;
   on: boolean;
   target: string; // '' | 'me' | LINE group id
+  face: Face | ''; // 顯示介面; '' = none chosen yet (the menu cell shows 未設定介面)
+  template: string; // a layout of `face`
+  persona: string; // this conversation's own 性格; '' = use the shared one
   pieces: Piece[];
   links: [number, number][];
 };
@@ -59,16 +69,17 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
     case 'organize':
       return { as: pick(p.as, VIEWS, 'calendar') };
     case 'command': {
+      // The owner's cue: the word alone shows this orb's page; the word followed by a
+      // request hands that request to the AI.
       const word = str(p.word, 8).replace(/\s/g, '');
       return word ? { word, show: pick(p.show, VIEWS, 'calendar') } : null;
     }
     case 'push': {
+      // day set = that day's events (what the old 提醒 piece did); otherwise `show`.
       const time = hhmm(p.time);
-      return time ? { time, show: pick(p.show, VIEWS, 'calendar') } : null;
-    }
-    case 'remind': {
-      const time = hhmm(p.time);
-      return time ? { time, day: pick(p.day, ['today', 'tomorrow'] as const, 'today') } : null;
+      return time
+        ? { time, show: pick(p.show, VIEWS, 'calendar'), day: pick(p.day, ['', 'today', 'tomorrow'] as const, '') }
+        : null;
     }
     case 'stats': {
       const subject = str(p.subject, 30);
@@ -92,11 +103,21 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
     }
     case 'announce':
       return {};
-    case 'answer': {
-      const wake = str(p.wake, 8).replace(/\s/g, '');
-      return wake ? { wake } : null;
-    }
+    case 'answer':
+      return {}; // replies to every message in this conversation
   }
+}
+
+/**
+ * Pieces saved by an older version: 提醒 became a 定時提醒 that sends that day's events, and
+ * 回答 with a call word became 指令 (the cue word); 回答 itself now answers every message.
+ */
+function upgradePiece(p: any) {
+  if (p?.type === 'remind')
+    return { ...p, type: 'push', params: p.params ? { ...p.params, show: 'calendar', day: p.params.day || 'today' } : null };
+  if (p?.type === 'answer' && p.params?.wake)
+    return { ...p, type: 'command', params: { word: p.params.wake, show: 'summary' } };
+  return p;
 }
 
 /** Validate an orb coming from the page or the database. Throws `orb_invalid`. */
@@ -104,7 +125,8 @@ export function cleanOrb(v: any, slot: number, groups: string[]): Orb {
   if (!v || typeof v !== 'object') throw Error('orb_invalid');
   const target = v.target === 'me' || groups.includes(v.target) ? v.target : '';
   const seen = new Set<number>();
-  const pieces: Piece[] = (Array.isArray(v.pieces) ? v.pieces : []).slice(0, 12).flatMap((p: any) => {
+  const pieces: Piece[] = (Array.isArray(v.pieces) ? v.pieces : []).slice(0, 12).flatMap((raw: any) => {
+    const p = upgradePiece(raw);
     if (!PIECE_TYPES.includes(p?.type) || !Number.isInteger(p?.id) || p.id < 1 || seen.has(p.id))
       return [];
     seen.add(p.id);
@@ -126,11 +148,18 @@ export function cleanOrb(v: any, slot: number, groups: string[]): Orb {
     if (a !== b && seen.has(a) && seen.has(b) && !links.some(([c, d]) => (c === a && d === b) || (c === b && d === a)))
       links.push([a, b]);
   }
+  // Orbs saved before 顯示介面 existed: the default orb was a calendar.
+  const face = v.face === undefined && pieces.some((p) => p.type === 'organize' && p.params?.as === 'calendar')
+    ? 'calendar'
+    : cleanFace(v.face);
   return {
     slot,
     name: str(v.name, 12) || `光球 ${slot}`,
     on: v.on === true,
     target,
+    face,
+    template: cleanTemplate(face, v.template),
+    persona: str(v.persona, PERSONA_MAX),
     pieces,
     links: links.slice(0, 40),
   };
@@ -152,12 +181,15 @@ export function defaultOrbs(): Orb[] {
       name: '光球 1',
       on: true,
       target: 'me',
+      face: 'calendar',
+      template: 'month',
+      persona: '',
       pieces: [
         P(1, 'record', '記下跟行程有關的內容', 0.2, 0.2, { topic: '行程' }),
         P(2, 'organize', '做成行事曆放在介面', 0.68, 0.2, { as: 'calendar' }),
         P(3, 'command', '輸入「行事曆」就跳出行事曆', 0.44, 0.5, { word: '行事曆', show: 'calendar' }),
-        P(4, 'push', '每天 21:00 推播行事曆', 0.2, 0.8, { time: '21:00', show: 'calendar' }),
-        P(5, 'remind', '早上 07:00 提醒當日行程', 0.7, 0.8, { time: '07:00', day: 'today' }),
+        P(4, 'push', '每天 21:00 推播行事曆', 0.2, 0.8, { time: '21:00', show: 'calendar', day: '' }),
+        P(5, 'push', '早上 07:00 提醒當日行程', 0.7, 0.8, { time: '07:00', show: 'calendar', day: 'today' }),
       ],
       links: [
         [1, 2],
@@ -166,8 +198,8 @@ export function defaultOrbs(): Orb[] {
         [4, 5],
       ],
     },
-    { slot: 2, name: '光球 2', on: false, target: '', pieces: [], links: [] },
-    { slot: 3, name: '光球 3', on: false, target: '', pieces: [], links: [] },
+    { slot: 2, name: '光球 2', on: false, target: '', face: '', template: '', persona: '', pieces: [], links: [] },
+    { slot: 3, name: '光球 3', on: false, target: '', face: '', template: '', persona: '', pieces: [], links: [] },
   ];
 }
 
@@ -182,9 +214,9 @@ export function localIssues(orb: Orb, others: Orb[]): Issue[] {
   if (!orb.pieces.length) out.push({ piece: null, code: 'empty', text: '平面上還沒有拼圖，請先放一片上來。' });
   for (const p of orb.pieces)
     if (!p.text) out.push({ piece: p.id, code: 'no_text', text: `「${PIECE_NAME[p.type]}」還沒有設定內容。你想讓它做什麼？` });
-  const needs = orb.pieces.some((p) => ['organize', 'command', 'push', 'remind'].includes(p.type));
+  const needs = orb.pieces.some((p) => ['organize', 'push'].includes(p.type));
   if (needs && !orb.pieces.some((p) => p.type === 'record' || p.type === 'stats'))
-    out.push({ piece: null, code: 'no_source', text: '整理、指令、推播、提醒都需要資料來源，但這裡沒有「紀錄」拼圖。' });
+    out.push({ piece: null, code: 'no_source', text: '整理和定時提醒都需要資料來源，但這裡沒有「紀錄」拼圖。' });
   if (orb.target === 'me' && orb.pieces.some((p) => p.type === 'announce' || p.type === 'stats'))
     out.push({ piece: null, code: 'group_only', text: '「公告」和「統計」要用在群組，請把對話對象改成群組。' });
   return out;
@@ -194,12 +226,11 @@ export function localIssues(orb: Orb, others: Orb[]): Issue[] {
 export const orbReady = (orb: Orb, others: Orb[]) =>
   !localIssues(orb, others).length && orb.pieces.every((p) => p.params);
 
-/** LINE menu: 打開秘書 + one button per lit orb with a 「指令」 piece (slots 1–3). */
+/** LINE menu labels: one per orb slot — the name of a lit orb's 顯示介面, or '' when none. */
 export function menuButtons(orbs: Orb[]) {
   return [1, 2, 3].map((slot) => {
     const orb = orbs.find((o) => o.slot === slot && o.on);
-    const word = orb?.pieces.find((p) => p.type === 'command')?.params?.word;
-    return typeof word === 'string' ? word : '';
+    return orb?.face ? FACE_NAME[orb.face] : '';
   });
 }
 
@@ -215,16 +246,16 @@ export function linkedGroups(orb: Orb): number[][] {
 
 /**
  * The fixed secretary-edition LINE menu: 打開秘書 plus one cell per orb. A lit orb with a
- * 「指令」 piece sends its word; the other cells open the orb page.
+ * 顯示介面 opens that page; the other cells (未設定介面) open the orb page.
  */
 export function orbMenu(orbs: Orb[], px: string, liffUrl: string) {
   const open = { type: 'uri', label: '打開秘書', uri: `${liffUrl}?view=orbs` };
   const cells = [
     open,
-    ...menuButtons(orbs).map((word, i) =>
-      word
-        ? { type: 'message', label: word, text: word }
-        : { type: 'uri', label: `光球 ${i + 1}`, uri: `${liffUrl}?view=orbs` },
+    ...menuButtons(orbs).map((label, i) =>
+      label
+        ? { type: 'uri', label, uri: `${liffUrl}?view=show&slot=${i + 1}` }
+        : { type: 'uri', label: '未設定介面', uri: `${liffUrl}?view=orbs` },
     ),
   ];
   return {

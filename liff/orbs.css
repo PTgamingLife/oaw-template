@@ -141,3 +141,15 @@ body.orbs-mode main{max-width:none;height:100%;padding:0;margin:0}
 #orbs-stage .tools{display:flex;flex-wrap:wrap;gap:8px}
 #orbs-stage .tools .btn3d{width:auto}
 #orbs-stage .mascot .clip{position:absolute;left:50%;bottom:-13%;width:150%;max-width:none;max-height:none;height:auto;transform:translateX(-50%);filter:drop-shadow(0 18px 14px rgba(88,102,214,.28));pointer-events:none}
+/* tray categories: 顯示介面 choices, 秘書性格 text, the add-group steps */
+#orbs-stage .tray .target{margin:2px 8px 8px}
+#orbs-stage .tray .faces{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:2px 8px 10px}
+#orbs-stage .tray .face{border:0;border-radius:16px;padding:10px 6px;background:#fff;box-shadow:0 4px 0 var(--line);font:inherit;color:var(--ink);cursor:pointer;display:grid;gap:3px;text-align:center}
+#orbs-stage .tray .face small{font-size:11px;color:var(--ink-soft);line-height:1.4}
+#orbs-stage .tray .face.on{background:linear-gradient(180deg,#FFE07A,#FFC53D);box-shadow:0 4px 0 #C97A10}
+#orbs-stage .tray .face.on small{color:#5A3B00}
+#orbs-stage .tray > div > .btn3d{margin:0 8px;width:auto;display:inline-block}
+#orbs-stage .tray .persona{margin:0 8px 10px;padding:10px 12px;background:#fff;border-radius:14px;font-size:12.5px;line-height:1.7;white-space:pre-line;max-height:150px;overflow-y:auto}
+#orbs-stage .tray .tools{padding:0 8px}
+#orbs-stage .sheet p{white-space:pre-line}
+#orbs-stage .sheet .steps{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px;line-height:1.6;color:var(--ink)}

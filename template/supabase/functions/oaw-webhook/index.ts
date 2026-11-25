@@ -21,7 +21,7 @@ import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-s
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import { bindNamedGroup, groupPostback, groupPrefs, groupText, ownerGroupSend } from '../_shared/groups.ts';
 import { groupHelp } from '../_shared/group-intent.ts';
-import { loadOrbs } from '../_shared/orbs.ts';
+import { loadOrbs, sharedPersona } from '../_shared/orbs.ts';
 import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
 import { orbText } from '../_shared/orb-run.ts';
 import {
@@ -91,7 +91,7 @@ async function handleGroup(event: any, line: ReturnType<typeof lineClient>) {
   if (!(await groupBound(groupId))) return;
   const orbs = await loadOrbs().catch(() => []);
   const orb = orbFor(orbs, groupId);
-  if (orb) return void (await orbText(event, line, owner, orb, groupId));
+  if (orb) return void (await orbText(event, line, owner, orb, groupId, await sharedPersona()));
   // An orb is set to this group but switched off: nothing runs and nothing is kept.
   if (orbClaims(orbs, groupId)) return;
   await groupText(event, line, owner);
@@ -219,7 +219,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     return;
   // The owner's own orb: its 指令 word and 回答 call word are answered before anything else.
   const mine = orbFor(orbs, 'me');
-  if (mine && (await orbText(event, line, owner, mine, userId))) return;
+  if (mine && (await orbText(event, line, owner, mine, userId, await sharedPersona()))) return;
   const health = await healthChat(event, userId, owner, line);
   if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);

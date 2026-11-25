@@ -1,9 +1,10 @@
 // Running the puzzle pieces of a lit orb: 指令 and 統計 words in a conversation, the call word
 // of 回答, what gets recorded, and the timed jobs (定時推播 / 提醒 / 統計截止). Pieces are fixed
 // building blocks with validated params — nothing the owner or a member types is executed.
-import { callWord, eventLine, upcomingEvents } from './groups.ts';
+import { answerAll, callWord, eventLine, upcomingEvents } from './groups.ts';
 import { orbFor, parseJob, pieceOf, tallyText, tallyTotals, windowStart } from './orb-logic.ts';
-import type { Orb, Piece } from './orb-model.ts';
+import { FACE_NAME, type Orb, type Piece } from './orb-model.ts';
+import { personaFor } from './persona.ts';
 import { noticeCard, quotaCard } from './onboarding.ts';
 import { apricoKey, countToday, db, env, onceToday, saveMessage, T } from './store.ts';
 
@@ -28,12 +29,18 @@ async function todos(sourceId: string) {
 }
 
 /** 行事曆 / 清單 / 摘要 of one conversation as a card; null when `quiet` and there is nothing. */
-export async function viewCard(show: string, sourceId: string, quiet = false, owner = '') {
-  // In the owner's own chat the card also opens the month calendar page.
+export async function viewCard(
+  show: string,
+  sourceId: string,
+  quiet = false,
+  owner = '',
+  page?: { label: string; uri: string },
+) {
+  // In the owner's own chat the card also opens the page (the orb's 顯示介面, else the calendar).
   const liff = env('LIFF_URL');
   const open =
     owner && sourceId === owner && liff
-      ? { label: '打開行事曆', uri: `${liff}?view=calendar` }
+      ? (page ?? { label: '打開行事曆', uri: `${liff}?view=calendar` })
       : undefined;
   const events = show === 'list' ? [] : (await upcomingEvents(sourceId)).map(eventLine);
   const list = show === 'calendar' ? [] : await todos(sourceId);
@@ -48,8 +55,11 @@ export async function viewCard(show: string, sourceId: string, quiet = false, ow
   return noticeCard('🗂 目前的整理', parts.length ? parts.join('\n').trim() : '目前沒有行程和待辦。', open);
 }
 
-/** Count a 統計 piece now. Returns the card, or 'quota' / null when it cannot be done. */
-export async function runTally(piece: Piece, groupId: string, line: Line, requestId: string) {
+/**
+ * Count a 統計 piece now: totals plus display names. 'empty' = nobody wrote anything yet,
+ * 'quota' = the owner's AI quota is used up, null = it could not be done.
+ */
+export async function tallyData(piece: Piece, groupId: string, line: Line, requestId: string) {
   const p = piece.params as any;
   const { data } = await db
     .from(T('messages'))
@@ -59,7 +69,6 @@ export async function runTally(piece: Piece, groupId: string, line: Line, reques
     .not('sender', 'is', null)
     .order('sent_at', { ascending: true })
     .limit(300);
-  const title = `🧾 ${p.subject}統計`;
   const rows: { sender: string; text: string }[] = [];
   let bytes = 0;
   for (const m of data ?? []) {
@@ -67,7 +76,7 @@ export async function runTally(piece: Piece, groupId: string, line: Line, reques
     if (bytes > 9000) break;
     rows.push(m);
   }
-  if (!rows.length) return noticeCard(title, `目前還沒有人登記${p.subject}。`);
+  if (!rows.length) return 'empty' as const;
   const labels = new Map<string, string>();
   for (const r of rows) if (!labels.has(r.sender)) labels.set(r.sender, `M${labels.size + 1}`);
   const base = env('APRICO_URL'),
@@ -100,14 +109,33 @@ export async function runTally(piece: Piece, groupId: string, line: Line, reques
     }
   }
   const nameOf = (label: string) => names.get(label) || `成員 ${label.slice(1)}`;
-  return noticeCard(title, tallyText(totals, p.subject, p.names, nameOf, out.unclear ?? []));
+  return { totals, nameOf, unclear: (out.unclear ?? []) as { who: string; text: string }[] };
 }
+
+/** The same count as a chat card. */
+export async function runTally(piece: Piece, groupId: string, line: Line, requestId: string) {
+  const p = piece.params as any;
+  const title = `🧾 ${p.subject}統計`;
+  const d = await tallyData(piece, groupId, line, requestId);
+  if (d === 'empty') return noticeCard(title, `目前還沒有人登記${p.subject}。`);
+  if (!d || d === 'quota') return d;
+  return noticeCard(title, tallyText(d.totals, p.subject, p.names, d.nameOf, d.unclear));
+}
+
+
 
 /**
  * A text line in a conversation that has a lit orb. Returns true when a piece answered it.
  * `sourceId` is the group id, or the owner's user id for the 1:1 chat.
  */
-export async function orbText(event: any, line: Line, owner: string, orb: Orb, sourceId: string) {
+export async function orbText(
+  event: any,
+  line: Line,
+  owner: string,
+  orb: Orb,
+  sourceId: string,
+  sharedPersona = '',
+) {
   const text: string = event.message.text.trim();
   const userId: string = event.source.userId ?? '';
   const reply = (m: unknown) => line.reply(event.replyToken, [m]);
@@ -127,18 +155,33 @@ export async function orbText(event: any, line: Line, owner: string, orb: Orb, s
     }
     await reply(card ?? noticeCard('🧾 統計', '暫時無法統計，請稍後再試。'));
   };
+  const style = { persona: personaFor(orb, sharedPersona) };
+  const focus = String(pieceOf(orb, 'record')?.params?.topic ?? '');
+  // 指令: the cue alone shows this orb's page; the cue followed by a request goes to the AI.
   if (command && text === command.params!.word) {
-    if (command.params!.show === 'stats' && stats) await tally();
-    else await reply((await viewCard(String(command.params!.show), sourceId, false, owner))!);
+    const liff = env('LIFF_URL');
+    const page =
+      orb.face && liff
+        ? { label: `打開${FACE_NAME[orb.face]}`, uri: `${liff}?view=show&slot=${orb.slot}` }
+        : undefined;
+    const show = orb.face === 'calendar' ? 'calendar' : orb.face ? 'summary' : String(command.params!.show);
+    if ((orb.face === 'stats' || command.params!.show === 'stats') && stats) await tally();
+    else await reply((await viewCard(show, sourceId, false, owner, page))!);
     return true;
   }
   if (stats && text === stats.params!.word) {
     await tally();
     return true;
   }
-  const focus = String(pieceOf(orb, 'record')?.params?.topic ?? '');
-  if (answer && (await callWord(event, line, owner, sourceId, String(answer.params!.wake), 30, focus)))
+  if (command && (await callWord(event, line, owner, sourceId, String(command.params!.word), 30, focus, style)))
     return true;
+  // 回答: every message gets a reply (short unless a question was asked). Capped per day.
+  if (answer) {
+    // Keep the line first (also in the 1:1 chat, whose usual save is skipped once we answer).
+    if (pieceOf(orb, 'record') || stats)
+      await saveMessage(sourceId, userId === owner, event.message.text, userId);
+    if (await answerAll(event, line, owner, sourceId, 60, { ...style, brief: true })) return true;
+  }
   // Groups: keep the line when this orb records or counts. (The 1:1 chat saves in the webhook.)
   if (orb.target !== 'me' && (pieceOf(orb, 'record') || stats))
     await saveMessage(sourceId, userId === owner, event.message.text, userId);
@@ -160,7 +203,7 @@ export async function runJob(name: string, orbs: Orb[], owner: string, line: Lin
     await line.push(owner, [noticeCard('⏰ 統計已截止', '以下是截止時的結果。'), card]);
     return 'sent';
   }
-  if (job.kind === 'remind') {
+  if (job.kind === 'push' && p.day) {
     const day = taipeiDay(p.day === 'tomorrow' ? 1 : 0);
     const { data } = await db
       .from(T('records'))

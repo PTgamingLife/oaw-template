@@ -150,13 +150,35 @@ export async function callWord(
   wake: string,
   daily: number,
   focus = '',
+  style: Style = {},
 ) {
   const groupId = sourceId;
   const userId: string = event.source.userId ?? '';
   const prefs = { wake, daily };
   const cmd = groupCommand(event.message.text, wake);
   if (!cmd) return false;
-  await runCall(cmd, event, line, owner, groupId, userId, prefs, focus);
+  await runCall(cmd, event, line, owner, groupId, userId, prefs, focus, style);
+  return true;
+}
+
+/** How an AI answer should sound: the 性格 text, and `brief` for the 回答 piece. */
+export type Style = { persona?: string; brief?: boolean };
+
+/**
+ * 「回答」 piece: answer this message whatever it says (no call word). `daily` caps the AI
+ * calls of one conversation per day, because every message costs the owner's quota.
+ */
+export async function answerAll(
+  event: any,
+  line: Line,
+  owner: string,
+  sourceId: string,
+  daily: number,
+  style: Style,
+) {
+  const text = String(event.message.text ?? '').trim().slice(0, 500);
+  if (!text) return false;
+  await runCall({ kind: 'ask', text }, event, line, owner, sourceId, event.source.userId ?? '', { wake: '秘書', daily }, '', style);
   return true;
 }
 
@@ -169,6 +191,7 @@ async function runCall(
   userId: string,
   prefs: { wake: string; daily: number },
   focus: string,
+  style: Style = {},
 ) {
   const reply = (...m: unknown[]) => line.reply(event.replyToken, m);
   const title = `🤖 ${prefs.wake}`;
@@ -240,6 +263,8 @@ async function runCall(
     text: cmd.text,
     lines,
     events,
+    ...(style.persona ? { persona: style.persona.slice(0, 800) } : {}),
+    ...(style.brief ? { brief: true } : {}),
   });
   if (status === 402) return void (await quotaOut());
   await reply(noticeCard(title, answer || '暫時無法回答，請稍後再試。'));
