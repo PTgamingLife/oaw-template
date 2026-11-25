@@ -165,6 +165,44 @@ export function cleanOrb(v: any, slot: number, groups: string[]): Orb {
   };
 }
 
+export type Plan = { suggest: { type: PieceType; text: string }[]; drop: number[]; face: Face | '' };
+/** What the AI proposed, limited to what this orb may hold. Nothing is applied here. */
+export function cleanPlan(v: any, orb: Orb): Plan {
+  const ids = new Set(orb.pieces.map((p) => p.id));
+  const drop: number[] = (Array.isArray(v?.drop) ? v.drop : []).filter((id: unknown) => ids.has(id as number));
+  let command = orb.pieces.some((p) => p.type === 'command' && !drop.includes(p.id));
+  const room = 12 - (orb.pieces.length - drop.length);
+  const suggest = (Array.isArray(v?.suggest) ? v.suggest : [])
+    .flatMap((s: any) => {
+      const text = str(s?.text, 200);
+      if (!PIECE_TYPES.includes(s?.type) || !text) return [];
+      // 統計 and 公告 only make sense in a group; an orb takes one 指令.
+      if (orb.target === 'me' && (s.type === 'stats' || s.type === 'announce')) return [];
+      if (s.type === 'command') {
+        if (command) return [];
+        command = true;
+      }
+      return [{ type: s.type as PieceType, text }];
+    })
+    .slice(0, Math.max(0, room));
+  return { suggest, drop, face: orb.face ? '' : cleanFace(v?.face) };
+}
+
+/** The orb after the owner agreed to a plan: pieces added (chained by links) and removed. */
+export function applyPlan(orb: Orb, plan: Plan): Orb {
+  const pieces = orb.pieces.filter((p) => !plan.drop.includes(p.id));
+  const links = orb.links.filter(([a, b]) => !plan.drop.includes(a) && !plan.drop.includes(b));
+  let id = Math.max(0, ...orb.pieces.map((p) => p.id));
+  for (const s of plan.suggest) {
+    const n = pieces.length;
+    const last = pieces[pieces.length - 1];
+    pieces.push({ id: ++id, type: s.type, text: s.text, x: 0.22 + (n % 3) * 0.28, y: 0.2 + (Math.floor(n / 3) % 3) * 0.3, params: null });
+    if (last) links.push([last.id, id]);
+  }
+  const face = orb.face || plan.face;
+  return { ...orb, on: false, pieces, links, face, template: cleanTemplate(face, orb.template) };
+}
+
 /** A new account starts with orb 1 lit: the owner's own calendar secretary. */
 export function defaultOrbs(): Orb[] {
   const P = (id: number, type: PieceType, text: string, x: number, y: number, params: object): Piece => ({

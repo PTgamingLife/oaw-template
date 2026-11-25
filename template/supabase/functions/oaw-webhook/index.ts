@@ -20,6 +20,7 @@ import { healthEnabled, healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
 import { guardOwner, ownerLocked } from '../_shared/guard.ts';
 import { bindNamedGroup, groupPostback, groupText, ownerGroupSend } from '../_shared/groups.ts';
+import { gotIt } from '../_shared/persona.ts';
 import { loadOrbs, sharedPersona } from '../_shared/orbs.ts';
 import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
 import { orbText } from '../_shared/orb-run.ts';
@@ -63,7 +64,7 @@ async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknow
   return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
-const RECORDED = '晚上 9 點會幫你整理成行程、帳務和待辦。';
+const RECORDED = '今晚 9 點會幫你整理成行程、帳務和待辦。';
 
 /**
  * Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly
@@ -396,7 +397,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
           return;
         }
         await saveMessage(userId, true, event.message.text, userId);
-        await reply(noticeCard('📝 已記下', RECORDED));
+        await reply(noticeCard(gotIt(), RECORDED));
         return;
       }
       if (intent.kind === 'fallback') {

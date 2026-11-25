@@ -28,3 +28,20 @@ export const DEFAULT_PERSONA = `你是主人的專屬 AI 秘書。
 /** The text in force for one orb: its own, else the owner's shared edit, else the default. */
 export const personaFor = (orb: Pick<Orb, 'persona'> | null, shared: string) =>
   (orb?.persona || shared || DEFAULT_PERSONA).slice(0, 800);
+
+/** 「收到」 in ten languages; one is picked for each note so the reply does not feel canned. */
+export const GOT_IT = [
+  'Got it!', // English
+  '了解です！', // Japanese
+  '알겠습니다!', // Korean
+  'Entendido!', // Spanish
+  'Bien reçu !', // French
+  'Verstanden!', // German
+  'Ricevuto!', // Italian
+  'รับทราบ!', // Thai
+  'Đã nhận!', // Vietnamese
+  'Recebido!', // Portuguese
+];
+/** Card title for a recorded line: one foreign 「收到」 plus the Chinese one. */
+export const gotIt = (pick = Math.random()) =>
+  `${GOT_IT[Math.min(GOT_IT.length - 1, Math.floor(pick * GOT_IT.length))]} 收到`;

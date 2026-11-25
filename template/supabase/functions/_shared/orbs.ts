@@ -2,8 +2,10 @@
 // Aprico's /orb turns the owner's plain words into piece parameters (billed to the owner).
 import { listGroups } from './groups.ts';
 import {
+  applyPlan,
   cleanOrb,
   cleanParams,
+  cleanPlan,
   cleanTemplate,
   FACES,
   defaultOrbs,
@@ -84,6 +86,40 @@ const slotOf = (v: unknown) => {
   return v as number;
 };
 
+/** Ask Aprico's /orb about one orb. Throws points_insufficient / rate_limited / orb_check_failed. */
+async function askOrb(orb: Orb, answers: Record<string, unknown>, request: string, requestId: string) {
+  const base = env('APRICO_URL'),
+    key = await apricoKey();
+  if (!base || !key) throw Error('aprico_not_connected');
+  const res = await fetch(`${base}/orb`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId,
+      // No conversation chosen yet: treat it as a group so group-only pieces can be proposed.
+      target: orb.target === 'me' ? 'me' : 'group',
+      // 顯示介面: the AI picks one layout from this face's list (never anything else).
+      ...(orb.face ? { face: orb.face, templates: FACES[orb.face], template: orb.template } : {}),
+      // The owner's request in plain words (長按光球).
+      ...(request.trim() ? { request: request.trim().slice(0, 300) } : {}),
+      pieces: orb.pieces.map((p) => ({
+        id: p.id,
+        type: p.type,
+        text: p.text || PIECE_NAME[p.type],
+        ...(typeof answers[p.id] === 'string' && (answers[p.id] as string).trim()
+          ? { answer: (answers[p.id] as string).slice(0, 200) }
+          : {}),
+      })),
+    }),
+    signal: AbortSignal.timeout(60000),
+  }).catch(() => null);
+  if (res?.status === 402) throw Error('points_insufficient');
+  if (res?.status === 429) throw Error('rate_limited');
+  const data = res?.ok ? await res.json().catch(() => null) : null;
+  if (!Array.isArray(data?.pieces)) throw Error('orb_check_failed');
+  return data;
+}
+
 /** LIFF actions: orb_list, orb_save (draft), orb_check (AI), orb_toggle. Owner only. */
 export async function orbAction(action: string, body: any, requestId: string) {
   const orbs = await loadOrbs();
@@ -111,6 +147,18 @@ export async function orbAction(action: string, body: any, requestId: string) {
   }
 
   const orb = cleanOrb(body.orb, slot, groups);
+  if (action === 'orb_plan' || action === 'orb_apply') {
+    // 用說的設定: the AI proposes pieces (orb_plan, nothing saved); when the owner agrees the
+    // page sends that proposal back (orb_apply) and the pieces are placed, unlit, to be checked.
+    if (action === 'orb_apply') {
+      await put(applyPlan(orb, cleanPlan(body.plan, orb)));
+      return { ...(await view(orbs)), timed: await syncCron(orbs) };
+    }
+    const request = typeof body.request === 'string' ? body.request.trim().slice(0, 300) : '';
+    if (!request) throw Error('orb_invalid');
+    const data = await askOrb(orb, {}, request, requestId);
+    return { proposal: cleanPlan(data, orb), note: typeof data.note === 'string' ? data.note.slice(0, 300) : '' };
+  }
   if (action === 'orb_save') {
     // A draft: an orb that is no longer complete goes dark until it is confirmed again.
     await put({ ...orb, on: orb.on && orbReady(orb, orbs) });
@@ -120,38 +168,11 @@ export async function orbAction(action: string, body: any, requestId: string) {
 
   let issues: Issue[] = localIssues(orb, orbs);
   let note = '';
+  let plan = cleanPlan(null, orb);
   if (!issues.length) {
     const answers = body.answers && typeof body.answers === 'object' ? body.answers : {};
-    const base = env('APRICO_URL'),
-      key = await apricoKey();
-    if (!base || !key) throw Error('aprico_not_connected');
-    const res = await fetch(`${base}/orb`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestId,
-        target: orb.target === 'me' ? 'me' : 'group',
-        // 顯示介面: the AI picks one layout from this face's list (never anything else).
-        ...(orb.face ? { face: orb.face, templates: FACES[orb.face], template: orb.template } : {}),
-        // Long-press 調整設定: the owner's request in plain words.
-        ...(typeof body.request === 'string' && body.request.trim()
-          ? { request: body.request.trim().slice(0, 300) }
-          : {}),
-        pieces: orb.pieces.map((p) => ({
-          id: p.id,
-          type: p.type,
-          text: p.text,
-          ...(typeof answers[p.id] === 'string' && answers[p.id].trim()
-            ? { answer: answers[p.id].slice(0, 200) }
-            : {}),
-        })),
-      }),
-      signal: AbortSignal.timeout(60000),
-    }).catch(() => null);
-    if (res?.status === 402) throw Error('points_insufficient');
-    if (res?.status === 429) throw Error('rate_limited');
-    const data = res?.ok ? await res.json().catch(() => null) : null;
-    if (!Array.isArray(data?.pieces)) throw Error('orb_check_failed');
+    const data = await askOrb(orb, answers, typeof body.request === 'string' ? body.request : '', requestId);
+    plan = cleanPlan(data, orb);
     for (const p of orb.pieces) {
       const got = data.pieces.find((x: any) => x?.id === p.id);
       if (!got) throw Error('orb_check_failed');
@@ -171,5 +192,6 @@ export async function orbAction(action: string, body: any, requestId: string) {
   // Confirming never lights the orb by itself; the owner presses 啟動 (orb_toggle) after this.
   await put({ ...orb, on: orb.on && !issues.length });
   await syncCron(orbs);
-  return { ...(await view(orbs)), issues, note, ready: !issues.length };
+  // `proposal`: pieces the AI suggests adding or removing; shown to the owner, applied only on agreement.
+  return { ...(await view(orbs)), issues, note, ready: !issues.length, proposal: plan };
 }
