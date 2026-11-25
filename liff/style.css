@@ -220,12 +220,12 @@ body.brand {
 .quota-track {
   height: 10px;
   border-radius: 999px;
-  background: #efe3d6;
+  background: #e4e8ff;
   overflow: hidden;
 }
 .quota-fill {
   height: 100%;
-  background: var(--text);
+  background: linear-gradient(90deg, #9aa7ff, #5866d6);
   border-radius: 999px;
 }
 /* ---- 健康 AI 秘書 ---- */
@@ -532,4 +532,11 @@ body.brand {
 .card label {
   display: block;
   margin: 8px 0 4px;
+}
+.back {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #5866d6;
+  font-weight: 700;
+  text-decoration: none;
 }

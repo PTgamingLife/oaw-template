@@ -77,7 +77,7 @@ export async function securitySection(h, call) {
   const note = h('p', { class: 'muted' });
   const render = (s) =>
     (note.textContent = s?.set
-      ? '已設定 PIN。套用設定、發布選單、健康頁與家人設定都會先確認 PIN（30 分鐘內不重問）。'
+      ? '已設定 PIN。啟動光球、發布選單這類重要動作都會先確認 PIN（30 分鐘內不重問）。'
       : '建議設定 6 位數 PIN：就算 LINE 帳號被盜，對方也無法更改你的設定。');
   render(status);
   const button = h(
