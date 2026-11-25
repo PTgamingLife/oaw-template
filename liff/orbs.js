@@ -239,15 +239,20 @@ export async function orbsView(h, show, call) {
     cur = structuredClone(o);
     linkFrom = null;
     dirty = false;
-    const sel = h('select', { id: 'orb-target' }, h('option', { value: '' }, '請選擇…'));
-    for (const t of targets()) {
-      const used = state.orbs.some((x) => x.slot !== cur.slot && x.target === t.id);
-      sel.append(h('option', { value: t.id, ...(used ? { disabled: '' } : {}) }, t.name + (used ? '（其他光球使用中）' : '')));
-    }
-    sel.append(h('option', { value: '+' }, '＋ 新增群組…'));
-    sel.value = cur.target;
+    const sel = h('select', { id: 'orb-target' });
+    const fill = () => {
+      sel.replaceChildren(h('option', { value: '' }, '請選擇…'));
+      for (const t of targets()) {
+        const used = state.orbs.some((x) => x.slot !== cur.slot && x.target === t.id);
+        sel.append(h('option', { value: t.id, ...(used ? { disabled: '' } : {}) }, t.name + (used ? '（其他光球使用中）' : '')));
+      }
+      sel.append(h('option', { value: '+' }, '＋ 新增群組…'));
+      sel.value = cur.target;
+    };
+    fill();
     sel.addEventListener('change', () => {
-      if (sel.value === '+') return (sel.value = cur.target), addGroupHelp(ui, window.OAW?.basicId);
+      // After the owner bound a group, 「我綁定好了」 reads the list again so it shows up here.
+      if (sel.value === '+') return (sel.value = cur.target), addGroupHelp(ui, window.OAW?.basicId, async () => (await server('orb_list', {}, '讀取群組…')) && fill());
       cur.target = sel.value;
       dirty = true;
     });
