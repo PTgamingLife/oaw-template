@@ -2,17 +2,8 @@
 // conversation (the owner's 1:1 chat or a bound group) and holds puzzle pieces. 確認 sends the
 // pieces to the AI, which asks back about anything missing; only a complete orb can be lit.
 import { securityMessage } from './security.js';
+import { addGroupHelp, adjustSheet, faceLabel, hold, tray as trayView, TYPES } from './orb-extra.js';
 
-const TYPES = {
-  record: ['紀錄', '例如：記下跟行程有關的內容'],
-  organize: ['整理', '例如：做成行事曆放在介面'],
-  command: ['指令', '例如：輸入「行事曆」就跳出行事曆'],
-  push: ['定時推播', '例如：每天 21:00 推播行事曆'],
-  remind: ['提醒', '例如：早上 07:00 提醒當日行程'],
-  stats: ['統計', '例如：統計便當，每天 11:00 截止，每人以最後一次為準'],
-  announce: ['公告', '例如：我說「發到群組：…」就發到這個群組'],
-  answer: ['回答', '例如：有人叫「小秘」就依最近的對話回答'],
-};
 const MOODS = ['m-hop', 'm-tilt', 'm-spin', 'm-pop', 'm-proud', 'm-shy', 'm-sleep', 'm-step'];
 // Moods that already have a generated expression clip (the rest are added as they are made).
 const CLIPS = { 'm-hop': { src: 'assets/moods/happy.webp', ms: 4050 } };
@@ -25,6 +16,7 @@ const errorText = (code) =>
     orb_check_failed: 'AI 暫時無法整理，請稍後再試。',
     orb_not_ready: '這顆光球還沒設定完成，請先點進去按「確認」。',
     orb_one_command: '每顆光球只能有一片「指令」拼圖。',
+    orb_save_failed: '沒有存成功，請再試一次。',
   })[code] ?? securityMessage(code);
 
 export async function orbsView(h, show, call) {
@@ -84,6 +76,7 @@ export async function orbsView(h, show, call) {
   }
 
   /* ---------- the fixed four-cell LINE menu, drawn here and published by the server ---------- */
+  const ui = { h, sheet, notice, server };
   let published = state.buttons.join('|');
   async function drawMenu() {
     const c = document.createElement('canvas');
@@ -102,7 +95,7 @@ export async function orbsView(h, show, call) {
       im.onerror = () => done(null);
       im.src = 'assets/secretary.png';
     });
-    const labels = ['打開秘書', ...state.buttons.map((w, i) => w || `光球 ${i + 1}`)];
+    const labels = ['打開秘書', ...state.buttons.map((w) => w || '未設定介面')];
     labels.forEach((label, i) => {
       const x = 22 + i * 294,
         lit = i === 0 || Boolean(state.buttons[i - 1]);
@@ -161,15 +154,8 @@ export async function orbsView(h, show, call) {
           h('span', { class: 'ball' }),
           h('span', { class: 'tag' }, o.name + ' ', h('small', {}, o.on ? (t ? t.name.replace(/^群組：|（.*$/g, '') : '') : '未開啟')),
         );
-        let timer = 0,
-          held = false;
-        b.addEventListener('pointerdown', () => {
-          held = false;
-          timer = setTimeout(() => ((held = true), orbSheet(o)), 550);
-        });
-        for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => clearTimeout(timer));
-        b.addEventListener('contextmenu', (e) => e.preventDefault());
-        b.addEventListener('click', () => !held && board(o));
+        const held = hold(b, () => orbSheet(o));
+        b.addEventListener('click', () => !held() && board(o));
         orbBox.append(b);
       });
     const img = h('img', { alt: 'AI 秘書', src: 'assets/secretary.png' });
@@ -208,17 +194,17 @@ export async function orbsView(h, show, call) {
         'section',
         { class: 'view' },
         h('h1', {}, '我的 AI 秘書'),
-        h('p', { class: 'sub' }, '點光球設定功能，長按可以開啟或關閉。'),
+        h('p', { class: 'sub' }, '點光球設定功能，長按可以用說的調整，或開啟、關閉。'),
         h('div', { class: 'sky' }, orbBox, h('div', { class: 'mascot' }, img, clip)),
         h(
           'div',
           { class: 'menu' },
-          h('p', {}, 'LINE 選單（光球的「指令」拼圖變成按鈕，啟動或關閉光球時自動更新）'),
+          h('p', {}, 'LINE 選單（每顆光球的「顯示介面」變成一顆按鈕，啟動或關閉光球時自動更新）'),
           h(
             'div',
             { class: 'cells' },
             h('div', { class: 'cell' }, '打開秘書'),
-            state.buttons.map((w) => h('div', { class: 'cell' + (w ? '' : ' empty') }, w || '未設定')),
+            state.buttons.map((w) => h('div', { class: 'cell' + (w ? '' : ' empty') }, w || '未設定介面')),
           ),
           h('div', { class: 'tools' }, state.plan === 'navigator' ? design : menuBtn, more),
         ),
@@ -226,17 +212,25 @@ export async function orbsView(h, show, call) {
     );
   }
   function orbSheet(o) {
-    const ready = o.pieces.length && o.target && o.pieces.every((p) => p.params);
-    const toggle = async (on) => {
-      if (!(await server('orb_toggle', { slot: o.slot, on }))) return;
-      if (menuChanged()) await publishMenu(true);
-      home();
-    };
-    sheet(
-      o.name,
-      o.on ? '關閉後，這顆光球的功能會暫停，設定會保留。' : ready ? '這顆光球已經設定好，可以直接開啟。' : '這顆光球還沒設定完成，請先點進去放拼圖並按「確認」。',
-      [o.on ? ['關閉光球', () => toggle(false), 'ghost'] : ready ? ['開啟光球', () => toggle(true)] : ['去設定', () => board(o)], ['取消', null, 'ghost']],
-    );
+    adjustSheet(ui, o, {
+      open: () => board(o),
+      toggle: async (on) => {
+        if (!(await server('orb_toggle', { slot: o.slot, on }))) return;
+        if (menuChanged()) await publishMenu(true);
+        home();
+      },
+      // The request goes to the AI with this orb's pieces; it can change them and the layout.
+      tune: async (request) => {
+        cur = structuredClone(o);
+        const r = await server('orb_check', { slot: o.slot, orb: o, answers: {}, request }, 'AI 調整中…');
+        cur = null;
+        if (!r) return;
+        if (menuChanged()) await publishMenu(true);
+        home();
+        const now = state.orbs.find((x) => x.slot === o.slot);
+        notice(r.issues[0] ? 'AI 想確認一下' : '調整好了', r.issues[0]?.text ?? `${r.note || '已經照你說的調整。'}\n\n顯示介面：${faceLabel(now)}`);
+      },
+    });
   }
 
   /* ---------- board ---------- */
@@ -250,27 +244,32 @@ export async function orbsView(h, show, call) {
       const used = state.orbs.some((x) => x.slot !== cur.slot && x.target === t.id);
       sel.append(h('option', { value: t.id, ...(used ? { disabled: '' } : {}) }, t.name + (used ? '（其他光球使用中）' : '')));
     }
+    sel.append(h('option', { value: '+' }, '＋ 新增群組…'));
     sel.value = cur.target;
-    sel.addEventListener('change', () => ((cur.target = sel.value), (dirty = true)));
+    sel.addEventListener('change', () => {
+      if (sel.value === '+') return (sel.value = cur.target), addGroupHelp(ui, window.OAW?.basicId);
+      cur.target = sel.value;
+      dirty = true;
+    });
     const back = h('button', { class: 'back', type: 'button', 'aria-label': '返回' }, '←');
     back.addEventListener('click', async () => {
       if (dirty) await server('orb_save', { slot: cur.slot, orb: cur }, '儲存中…');
+      // A lit orb whose 顯示介面 changed needs its LINE menu cell redrawn.
+      if (menuChanged()) await publishMenu(true);
       home();
     });
     const confirm = h('button', { class: 'btn3d small', type: 'button' }, '確認');
     confirm.addEventListener('click', () => check({}));
-    const tray = h('div', { class: 'row' });
-    for (const [type, [name]] of Object.entries(TYPES)) {
-      const b = h('button', { class: `piece s-${type}`, type: 'button' }, name);
-      b.addEventListener('click', () => {
+    const tray = trayView(ui, cur, state, {
+      change: () => (dirty = true),
+      add: (type) => {
         if (type === 'command' && cur.pieces.some((p) => p.type === 'command'))
-          return notice('每顆光球只能有一個「指令」', '一顆光球只會變成 LINE 選單上的一顆按鈕，所以只能放一片「指令」拼圖。');
+          return notice('每顆光球只能有一個「指令」', '一顆光球只需要一個暗號，所以只能放一片「指令」拼圖。');
         if (cur.pieces.length >= 12) return notice('拼圖太多了', '一顆光球最多放 12 片拼圖。');
         const n = cur.pieces.length;
         addPiece(type, '', 0.22 + (n % 3) * 0.28, 0.2 + (Math.floor(n / 3) % 3) * 0.3);
-      });
-      tray.append(b);
-    }
+      },
+    });
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     stage.replaceChildren(
       h(
@@ -279,7 +278,7 @@ export async function orbsView(h, show, call) {
         h('div', { class: 'bar' }, back, h('h1', {}, cur.name), confirm),
         h('label', { class: 'target' }, '對話對象', sel),
         h('div', { id: 'plane' }, svg),
-        h('div', { class: 'tray' }, h('p', {}, '點拼圖放到上面的平面；點平面上的拼圖可以設定、連結或刪除。'), tray),
+        tray,
       ),
     );
     stage.querySelector('#plane').addEventListener('pointerdown', (e) => e.target.id === 'plane' && closePop());
@@ -447,7 +446,7 @@ export async function orbsView(h, show, call) {
         if (!r) return;
         if (menuChanged()) await publishMenu(true);
         home();
-        if (r.timed === false) notice('光球已啟動', '定時功能（定時推播、提醒、統計截止）暫時無法排程，其他功能正常。請稍後再開關一次光球，或聯絡專員。');
+        if (r.timed === false) notice('光球已啟動', '定時功能（定時提醒、統計截止）暫時無法排程，其他功能正常。請稍後再開關一次光球，或聯絡專員。');
       }],
       ['再調整', null, 'ghost'],
     ], [h('div', { class: 'good' }, list), alone.length ? h('p', {}, `「${alone.join('、')}」沒有和其他拼圖連結，會各自獨立運作。`) : null], true);

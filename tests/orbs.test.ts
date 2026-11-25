@@ -21,10 +21,11 @@ test('a new account has orb 1 lit, ready, and one menu button from its 指令 pi
 
 test('piece params are cleaned and required values are enforced', () => {
   assert.equal(cleanParams('push', { time: '9點', show: 'calendar' }), null);
-  assert.deepEqual(cleanParams('push', { time: '21:00', show: 'hack' }), { time: '21:00', show: 'calendar' });
+  assert.deepEqual(cleanParams('push', { time: '21:00', show: 'hack' }), { time: '21:00', show: 'calendar', day: '' });
+  assert.equal(cleanParams('push', { time: '07:00', day: 'tomorrow' })?.day, 'tomorrow');
   assert.equal(cleanParams('command', { word: ' ' }), null);
   assert.deepEqual(cleanParams('command', { word: '行 事 曆', show: 'list' }), { word: '行事曆', show: 'list' });
-  assert.equal(cleanParams('answer', {}), null);
+  assert.deepEqual(cleanParams('answer', {}), {}); // 回答 needs no settings: it answers everything
   const s = cleanParams('stats', {
     subject: '便當',
     items: [{ name: '雞腿', price: 100 }, { name: '', price: 5 }, { name: '排骨', price: -1 }],
@@ -92,10 +93,11 @@ test('cron jobs: Taipei times become UTC, only lit orbs with params are schedule
   assert.deepEqual(cronJobs(orbs), [
     { name: 'digest', cron: '55 12 * * *' },
     { name: 'push-1-4', cron: '0 13 * * *' },
-    { name: 'remind-1-5', cron: '0 23 * * *' },
+    { name: 'push-1-5', cron: '0 23 * * *' },
   ]);
   assert.equal(cronJobs([{ ...orbs[0], on: false }]).length, 1);
-  assert.deepEqual(parseJob('remind-1-5'), { kind: 'remind', slot: 1, piece: 5 });
+  // A job registered by an older version still finds its (upgraded) piece.
+  assert.deepEqual(parseJob('remind-1-5'), { kind: 'push', slot: 1, piece: 5 });
   assert.equal(parseJob('drop-1-5'), null);
   assert.equal(orbFor(orbs, 'me')?.slot, 1);
   assert.equal(orbFor([{ ...orbs[0], on: false }], 'me'), null);
@@ -131,7 +133,34 @@ test('the secretary menu has four cells: 打開秘書, then each orb\'s word or 
   assert.deepEqual(m.size, { width: 1200, height: 405 });
   assert.equal(m.name, 'cafe-main');
   assert.deepEqual(m.areas.map((a) => a.bounds.x), [0, 300, 600, 900]);
-  assert.deepEqual(m.areas.map((a: any) => a.action.label), ['打開秘書', '行事曆', '光球 2', '光球 3']);
-  assert.deepEqual(m.areas[1].action, { type: 'message', label: '行事曆', text: '行事曆' });
+  assert.deepEqual(m.areas.map((a: any) => a.action.label), ['打開秘書', '行事曆', '未設定介面', '未設定介面']);
+  assert.deepEqual(m.areas[1].action, { type: 'uri', label: '行事曆', uri: 'https://liff.line.me/1-a?view=show&slot=1' });
   assert.equal((m.areas[2].action as any).uri, 'https://liff.line.me/1-a?view=orbs');
+});
+
+test('顯示介面: one face per orb, layouts limited to the list, old orbs upgraded', () => {
+  const groups: string[] = [];
+  const base = { on: false, target: 'me', pieces: [], links: [] };
+  assert.equal(cleanOrb({ ...base, face: 'stats', template: 'trend' }, 2, groups).template, 'trend');
+  // A layout from another face, or an unknown one, falls back to the face's first layout.
+  assert.equal(cleanOrb({ ...base, face: 'notes', template: 'trend' }, 2, groups).template, 'list');
+  assert.equal(cleanOrb({ ...base, face: 'hologram', template: 'x' }, 2, groups).face, '');
+  assert.equal(cleanOrb({ ...base, persona: 'x'.repeat(2000) }, 2, groups).persona.length, 800);
+  // Saved before faces existed: a calendar orb keeps opening the calendar.
+  const old = cleanOrb(
+    {
+      ...base,
+      pieces: [
+        { id: 1, type: 'organize', text: '做成行事曆', params: { as: 'calendar' } },
+        { id: 2, type: 'remind', text: '早上提醒', params: { time: '07:00', day: 'today' } },
+        { id: 3, type: 'answer', text: '叫小秘就回答', params: { wake: '小秘' } },
+      ],
+    },
+    1,
+    groups,
+  );
+  assert.equal(old.face, 'calendar');
+  assert.deepEqual(old.pieces.map((p) => p.type), ['organize', 'push', 'command']);
+  assert.deepEqual(old.pieces[1].params, { time: '07:00', show: 'calendar', day: 'today' });
+  assert.equal(old.pieces[2].params?.word, '小秘');
 });

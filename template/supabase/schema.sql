@@ -45,6 +45,8 @@ create table if not exists public.__px___orbs (
   data jsonb not null,
   updated_at timestamptz not null default now()
 );
+-- 秘書性格: the owner's shared text; null = never edited, the built-in default applies.
+alter table public.__px___owner add column if not exists persona text;
 alter table public.__px___orbs enable row level security;
 revoke all on public.__px___orbs from public, anon, authenticated;
 grant select, insert, update, delete on public.__px___orbs to service_role;
@@ -161,6 +163,8 @@ create table if not exists public.__px___records (
 alter table public.__px___groups add column if not exists name text not null default '';
 alter table public.__px___records add column if not exists source_id text;
 create index if not exists __px___records_source on public.__px___records (source_id, kind, day);
+-- 備註記事「待辦勾選」: a todo the owner ticked off.
+alter table public.__px___records add column if not exists done boolean not null default false;
 -- Who said each line (LINE user id), for 統計.
 alter table public.__px___messages add column if not exists sender text;
 create index if not exists __px___messages_source on public.__px___messages (source_id, sent_at);

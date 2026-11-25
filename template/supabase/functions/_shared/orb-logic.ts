@@ -18,7 +18,7 @@ export function cronAt(hhmm: string) {
 
 export type CronJob = { name: string; cron: string };
 /**
- * Jobs for the lit orbs: the nightly organise run (20:55), one per 定時推播 / 提醒 piece, and
+ * Jobs for the lit orbs: the nightly organise run (20:55), one per 定時提醒 piece, and
  * one per 統計 piece with a closing time (the result goes to the owner privately).
  */
 export function cronJobs(orbs: Orb[]): CronJob[] {
@@ -26,8 +26,8 @@ export function cronJobs(orbs: Orb[]): CronJob[] {
   for (const o of orbs.filter((o) => o.on))
     for (const p of o.pieces) {
       if (!p.params) continue;
-      if (p.type === 'push' || p.type === 'remind')
-        jobs.push({ name: `${p.type}-${o.slot}-${p.id}`, cron: cronAt(String(p.params.time)) });
+      if (p.type === 'push')
+        jobs.push({ name: `push-${o.slot}-${p.id}`, cron: cronAt(String(p.params.time)) });
       if (p.type === 'stats' && p.params.close)
         jobs.push({ name: `stats-${o.slot}-${p.id}`, cron: cronAt(String(p.params.close)) });
     }
@@ -35,8 +35,10 @@ export function cronJobs(orbs: Orb[]): CronJob[] {
 }
 export function parseJob(name: string) {
   if (name === 'digest') return { kind: 'digest' as const, slot: 0, piece: 0 };
+  // 'remind-…' names come from jobs registered by an older version; they run as 定時提醒.
   const m = name.match(/^(push|remind|stats)-([1-4])-(\d{1,3})$/);
-  return m ? { kind: m[1] as 'push' | 'remind' | 'stats', slot: Number(m[2]), piece: Number(m[3]) } : null;
+  if (!m) return null;
+  return { kind: (m[1] === 'stats' ? 'stats' : 'push') as 'push' | 'stats', slot: Number(m[2]), piece: Number(m[3]) };
 }
 
 /** Start of today's counting window (Taipei) as an ISO time: `open` today, else midnight. */

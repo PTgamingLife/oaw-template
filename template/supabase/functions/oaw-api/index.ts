@@ -19,6 +19,7 @@ import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
 import { groupAction } from '../_shared/groups.ts';
 import { loadOrbs, orbAction } from '../_shared/orbs.ts';
+import { showData } from '../_shared/show.ts';
 import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
@@ -181,7 +182,16 @@ Deno.serve(async (req) => {
       if (body.action === 'link_revoke')
         return respond(await aprLink('revoke', { linkId: body.linkId }));
     }
-    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle'].includes(body.action)) {
+    if (body.action === 'orb_show') {
+      // An orb's 顯示介面 page. Looking needs an unlocked owner; nothing here needs the PIN.
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, false);
+      const orb = (await loadOrbs()).find((o) => o.slot === body.slot && o.on);
+      if (!orb) return respond({ error: 'orb_off' }, 404);
+      const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
+      return respond(await showData(orb, user.sub, line, body, `show-${crypto.randomUUID()}`));
+    }
+    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle', 'orb_persona'].includes(body.action)) {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action !== 'orb_list');
       const out = await orbAction(body.action, body, `orb-${crypto.randomUUID()}`);

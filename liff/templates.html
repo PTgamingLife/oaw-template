@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>光球顯示模板範例</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap">
+<style>
+/* Layout: a wall of phone-sized cards, one per template, grouped by 顯示介面. Single light look,
+   the same as the secretary's own pages (the app has no dark mode). */
+:root {
+  --sky-a: #ede7fb; --sky-b: #d9e4fb; --sky-c: #f7f2ff;
+  --ink: #2b2a4a; --soft: #6b6a8c; --line: #c9cef2; --card: #ffffff;
+  --accent: #7c8cf0; --deep: #5866d6; --sun: #ffc53d; --sun-deep: #f29a1f;
+  --mint: #6fc3ad; --coral: #ee8b78; --pink: #f09ab4;
+  --body: 'Noto Sans TC', system-ui, -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+}
+body { background: linear-gradient(160deg, var(--sky-a), var(--sky-b) 55%, var(--sky-c)); color: var(--ink); font-family: var(--body);
+  padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1080px; margin: 0 auto; display: grid; gap: 28px; }
+h1 { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+h2 { font-size: 19px; font-weight: 900; margin: 0; }
+.lead { margin: 6px 0 0; color: var(--soft); line-height: 1.8; max-width: 62ch; }
+.note { color: var(--soft); font-size: 13px; line-height: 1.7; margin: 4px 0 0; }
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.tpl { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.tpl > b { font-size: 15px; }
+.tpl > span { font-size: 12.5px; color: var(--soft); line-height: 1.6; }
+.phone { background: var(--card); border-radius: 22px; padding: 14px; box-shadow: 0 10px 24px rgba(88, 102, 214, .16); display: grid; gap: 10px; font-size: 13px; min-width: 0; }
+.phone h3 { margin: 0; font-size: 15px; font-weight: 900; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.phone h3 small { font-weight: 400; color: var(--soft); font-size: 11.5px; }
+.num { font-variant-numeric: tabular-nums; }
+/* 數量排行 */
+.rank { display: grid; gap: 8px; }
+.rank div { display: grid; grid-template-columns: 5.5em 1fr 2.2em; gap: 8px; align-items: center; }
+.rank i { height: 14px; border-radius: 999px; background: linear-gradient(90deg, #9aa7ff, var(--deep)); display: block; }
+.rank div:first-child i { background: linear-gradient(90deg, #ffe07a, var(--sun-deep)); }
+.rank span:last-child { text-align: right; font-weight: 700; }
+/* 每人明細 */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #e9ebfa; }
+th { font-size: 11.5px; color: var(--soft); font-weight: 700; }
+td:last-child, th:last-child { text-align: right; }
+tr.sum td { border-bottom: 0; font-weight: 900; }
+/* 每日趨勢 */
+svg { display: block; width: 100%; height: auto; }
+.axis { fill: var(--soft); font-size: 9px; font-family: var(--body); }
+/* 金額合計 */
+.total { font-size: 30px; font-weight: 900; line-height: 1.1; }
+.split { display: flex; height: 14px; border-radius: 999px; overflow: hidden; }
+.split i { display: block; }
+.legend { display: grid; gap: 5px; }
+.legend div { display: flex; justify-content: space-between; gap: 8px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+/* 備註 */
+ul.list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+ul.list li { padding: 8px 10px; background: #f3f4ff; border-radius: 12px; line-height: 1.5; }
+ul.list small { display: block; color: var(--soft); font-size: 11px; }
+.todo li { display: flex; gap: 8px; align-items: flex-start; }
+.box { flex: none; width: 17px; height: 17px; border-radius: 6px; border: 2px solid var(--accent); margin-top: 1px; }
+.done .box { background: var(--accent); box-shadow: inset 0 0 0 3px #fff; }
+.done span { color: var(--soft); text-decoration: line-through; }
+.wall { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wall div { border-radius: 14px; padding: 9px; line-height: 1.5; min-height: 66px; }
+.wall b { display: block; font-size: 12px; margin-bottom: 2px; }
+.line { display: grid; gap: 0; }
+.line div { display: grid; grid-template-columns: 3.4em 14px 1fr; gap: 8px; padding-bottom: 12px; position: relative; }
+.line div::before { content: ""; position: absolute; left: calc(3.4em + 14px); top: 12px; bottom: 0; width: 2px; background: var(--line); }
+.line div:last-child::before { display: none; }
+.line i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); margin-top: 3px; position: relative; z-index: 1; }
+.line time { color: var(--soft); font-size: 11.5px; padding-top: 1px; }
+/* 行事曆 */
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; font-size: 11.5px; }
+.cal b { color: var(--soft); font-size: 10.5px; font-weight: 700; }
+.cal span { padding: 5px 0; border-radius: 9px; position: relative; }
+.cal .on { background: linear-gradient(180deg, #9aa7ff, var(--deep)); color: #fff; font-weight: 700; }
+.cal .ev::after { content: ""; position: absolute; left: 50%; bottom: 1px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--sun-deep); }
+.cal .mute { color: #c4c6dc; }
+.back { color: var(--deep); font-weight: 700; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="index.html?view=orbs" onclick="if(history.length>1){history.back();return false}">← 回上一頁</a>
+  <header>
+    <h1>光球顯示模板範例</h1>
+    <p class="lead">每顆光球選一種顯示介面。AI 會依照你放的拼圖內容，自動挑一個最合適的模板；想換，在秘書主畫面長按光球，用口語說就可以；只能在下面這些模板之間換，想要其他形式請聯絡服務人員。</p>
+    <p class="note">以下全部是示範資料。</p>
+  </header>
+
+  <section class="tpl">
+    <h2>行事曆（維持現有的月曆）</h2>
+    <div class="grid">
+      <div class="tpl">
+        <div class="phone">
+          <h3>2026 年 12 月 <small>點日期看當天</small></h3>
+          <div class="cal num">
+            <b>日</b><b>一</b><b>二</b><b>三</b><b>四</b><b>五</b><b>六</b>
+            <span class="mute">29</span><span class="mute">30</span><span>1</span><span class="ev">2</span><span>3</span><span class="on">4</span><span>5</span>
+            <span>6</span><span>7</span><span class="ev">8</span><span>9</span><span>10</span><span class="ev">11</span><span>12</span>
+            <span>13</span><span>14</span><span>15</span><span>16</span><span class="ev">17</span><span>18</span><span>19</span>
+          </div>
+          <ul class="list"><li>15:00 產品會議<small>12 月 4 日（五）</small></li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tpl">
+    <h2>統計圖表（四種）</h2>
+    <div class="grid">
+      <div class="tpl">
+        <b>① 數量排行</b><span>適合：便當、飲料、投票。誰最多一眼看到。</span>
+        <div class="phone">
+          <h3>今天的便當 <small>11:00 截止・共 14 份</small></h3>
+          <div class="rank num">
+            <div><span>雞腿飯</span><i style="width:100%"></i><span>6</span></div>
+            <div><span>排骨飯</span><i style="width:67%"></i><span>4</span></div>
+            <div><span>素食</span><i style="width:33%"></i><span>2</span></div>
+            <div><span>魚排飯</span><i style="width:33%"></i><span>2</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>② 每人明細</b><span>適合：要收錢、要對帳。每個人點了什麼、多少錢。</span>
+        <div class="phone">
+          <h3>今天的便當 <small>共 5 人</small></h3>
+          <table class="num">
+            <tr><th>誰</th><th>品項</th><th>金額</th></tr>
+            <tr><td>小美</td><td>雞腿飯</td><td>110</td></tr>
+            <tr><td>阿傑</td><td>排骨飯 ×2</td><td>200</td></tr>
+            <tr><td>Ivy</td><td>素食</td><td>90</td></tr>
+            <tr><td>老陳</td><td>雞腿飯</td><td>110</td></tr>
+            <tr class="sum"><td>合計</td><td></td><td>NT$510</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>③ 每日趨勢</b><span>適合：每天回報的數字，例如來客數、運動、業績。</span>
+        <div class="phone">
+          <h3>本週來客數 <small>平均 38 人</small></h3>
+          <svg viewBox="0 0 240 120" role="img" aria-label="本週來客數：週一 28、週二 34、週三 31、週四 42、週五 55、週六 47、週日 29">
+            <g stroke="#e4e7fb" stroke-width="1"><line x1="24" y1="20" x2="236" y2="20"/><line x1="24" y1="55" x2="236" y2="55"/><line x1="24" y1="90" x2="236" y2="90"/></g>
+            <text class="axis" x="0" y="23">60</text><text class="axis" x="0" y="58">30</text><text class="axis" x="6" y="93">0</text>
+            <polygon fill="#7c8cf0" fill-opacity=".18" points="38,57.3 70,50.3 102,53.8 134,41 166,25.8 198,35.2 230,56.2 230,90 38,90"/>
+            <polyline fill="none" stroke="#5866d6" stroke-width="2.5" stroke-linejoin="round" points="38,57.3 70,50.3 102,53.8 134,41 166,25.8 198,35.2 230,56.2"/>
+            <circle cx="166" cy="25.8" r="4.5" fill="#f29a1f"/><text class="axis" x="158" y="15" style="fill:#2b2a4a;font-weight:700">55</text>
+            <g class="axis" text-anchor="middle"><text x="38" y="106">一</text><text x="70" y="106">二</text><text x="102" y="106">三</text><text x="134" y="106">四</text><text x="166" y="106">五</text><text x="198" y="106">六</text><text x="230" y="106">日</text></g>
+          </svg>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>④ 金額合計</b><span>適合：記帳、團費、代墊。總數加上分類占比。</span>
+        <div class="phone">
+          <h3>12 月支出 <small>共 23 筆</small></h3>
+          <div class="total num">NT$8,640</div>
+          <div class="split"><i style="width:48%;background:var(--deep)"></i><i style="width:27%;background:var(--mint)"></i><i style="width:15%;background:var(--sun)"></i><i style="width:10%;background:var(--pink)"></i></div>
+          <div class="legend num">
+            <div><span><i class="dot" style="background:var(--deep)"></i>餐飲</span><b>4,150</b></div>
+            <div><span><i class="dot" style="background:var(--mint)"></i>交通</span><b>2,330</b></div>
+            <div><span><i class="dot" style="background:var(--sun)"></i>日用品</span><b>1,300</b></div>
+            <div><span><i class="dot" style="background:var(--pink)"></i>其他</span><b>860</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tpl">
+    <h2>備註記事（四種）</h2>
+    <div class="grid">
+      <div class="tpl">
+        <b>① 條列清單</b><span>適合：會議重點、交辦紀錄。一條一件事，附時間。</span>
+        <div class="phone">
+          <h3>業務群重點 <small>今天 5 則</small></h3>
+          <ul class="list">
+            <li>報價單週五前給王經理<small>10:12 阿傑</small></li>
+            <li>展場攤位改到 B12<small>11:40 小美</small></li>
+            <li>下週一改成線上開會<small>14:05 老陳</small></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>② 待辦勾選</b><span>適合：要追完成度的事。點一下就打勾。</span>
+        <div class="phone">
+          <h3>本週待辦 <small>完成 2／5</small></h3>
+          <ul class="list todo">
+            <li class="done"><i class="box"></i><span>寄出合約</span></li>
+            <li class="done"><i class="box"></i><span>訂會議室</span></li>
+            <li><i class="box"></i><span>準備簡報初稿</span></li>
+            <li><i class="box"></i><span>回覆廠商報價</span></li>
+            <li><i class="box"></i><span>繳停車費</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>③ 卡片牆</b><span>適合：靈感、想法、依主題分類的筆記。</span>
+        <div class="phone">
+          <h3>靈感筆記 <small>4 個主題</small></h3>
+          <div class="wall">
+            <div style="background:#eef0ff"><b>新品</b>柚子口味冬季限定</div>
+            <div style="background:#e6f6f1"><b>活動</b>集點換早鳥票</div>
+            <div style="background:#fff3d6"><b>文案</b>「今天也辛苦了」系列</div>
+            <div style="background:#fde8ee"><b>待查</b>包材供應商比價</div>
+          </div>
+        </div>
+      </div>
+      <div class="tpl">
+        <b>④ 時間軸</b><span>適合：照顧紀錄、專案進度、一天的流水帳。</span>
+        <div class="phone">
+          <h3>今天的紀錄 <small>12 月 4 日</small></h3>
+          <div class="line">
+            <div><time>08:10</time><i></i><span>早餐吃完、血壓 128／82</span></div>
+            <div><time>10:30</time><i></i><span>復健 40 分鐘</span></div>
+            <div><time>13:00</time><i></i><span>午睡</span></div>
+            <div><time>18:20</time><i></i><span>晚餐後散步一圈</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>
