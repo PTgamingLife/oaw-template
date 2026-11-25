@@ -129,21 +129,50 @@ export function addGroupHelp(ui, basicId, refresh) {
   sheet('新增群組', '官方帳號沒有辦法用連結自己加入群組，要由群組成員邀請它。', [['我綁定好了', refresh], ['先不用', null, 'ghost']], [h('ol', { class: 'steps' }, steps.map((t) => h('li', {}, t)))], true);
 }
 
-/** Long-press on an orb: say in plain words what to change, or switch the orb on and off. */
+/** Long-press on an orb: say in plain words what it should do, or switch it on and off. */
 export function adjustSheet(ui, o, act) {
   const { h, sheet } = ui;
   const ready = o.pieces.length && o.target && o.pieces.every((p) => p.params);
-  const ta = h('textarea', { id: 'adjust-text', rows: '3', maxlength: '300', placeholder: '例如：改成每天晚上八點提醒／統計改成看每個人點了什麼' });
+  const ta = h('textarea', {
+    id: 'adjust-text',
+    rows: '3',
+    maxlength: '300',
+    placeholder: ready ? '例如：改成每天晚上八點提醒／統計改成看每個人點了什麼' : '例如：幫我統計午餐群每天的便當，十一點截止',
+  });
   sheet(
-    `調整「${o.name}」`,
+    `${ready ? '調整' : '設定'}「${o.name}」`,
     ready
       ? `顯示介面：${faceLabel(o)}。直接用說的告訴秘書想怎麼調整；版型只能在範例裡的幾種之間換，想要其他形式請聯絡服務人員。`
-      : '這顆光球還沒設定完成，請先點進去放拼圖並按「確認」。',
+      : '直接用說的告訴秘書，這顆光球要幫你做什麼。秘書會建議需要的拼圖，你同意後才會放上去。也可以自己點進去放拼圖。',
     [
-      ...(ready ? [['送出調整', () => ta.value.trim() && act.tune(ta.value.trim())]] : [['去設定', act.open]]),
-      o.on ? ['關閉光球', () => act.toggle(false), 'ghost'] : ready ? ['開啟光球', () => act.toggle(true), 'ghost'] : null,
+      [ready ? '送出調整' : '請秘書建議', () => ta.value.trim() && (ready ? act.tune : act.plan)(ta.value.trim())],
+      o.on ? ['關閉光球', () => act.toggle(false), 'ghost'] : ready ? ['開啟光球', () => act.toggle(true), 'ghost'] : ['自己設定', act.open, 'ghost'],
       ['取消', null, 'ghost'],
-    ].filter(Boolean),
-    ready ? [ta] : [],
+    ],
+    [ta],
+  );
+}
+
+/** Show what the AI proposes to add or remove. Nothing changes until the owner agrees. */
+export function planSheet(ui, o, plan, note, act) {
+  const { h, sheet } = ui;
+  const rows = [
+    plan.face ? h('li', {}, h('b', {}, '顯示介面'), `：${FACES[plan.face][0]}`) : null,
+    ...plan.suggest.map((s) => h('li', {}, h('b', {}, `新增「${TYPES[s.type][0]}」`), `：${s.text}`)),
+    ...plan.drop.map((id) => {
+      const p = o.pieces.find((x) => x.id === id);
+      return p ? h('li', {}, h('b', {}, `拿掉「${TYPES[p.type][0]}」`), p.text ? `：${p.text}` : '') : null;
+    }),
+  ].filter(Boolean);
+  sheet(
+    '秘書的建議',
+    note || null,
+    [
+      ['同意，幫我設定', act.agree],
+      ['再改一下', act.again, 'ghost'],
+      ['取消', null, 'ghost'],
+    ],
+    [h('ul', { class: 'plan' }, rows), h('p', {}, '同意後會把拼圖放好，但光球先不會開啟，你看過再開。')],
+    true,
   );
 }

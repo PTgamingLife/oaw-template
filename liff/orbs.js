@@ -2,7 +2,7 @@
 // conversation (the owner's 1:1 chat or a bound group) and holds puzzle pieces. 確認 sends the
 // pieces to the AI, which asks back about anything missing; only a complete orb can be lit.
 import { securityMessage } from './security.js';
-import { addGroupHelp, adjustSheet, faceLabel, hold, tray as trayView, TYPES } from './orb-extra.js';
+import { addGroupHelp, adjustSheet, faceLabel, hold, planSheet, tray as trayView, TYPES } from './orb-extra.js';
 
 const MOODS = ['m-hop', 'm-tilt', 'm-spin', 'm-pop', 'm-proud', 'm-shy', 'm-sleep', 'm-step'];
 // Moods that already have a generated expression clip (the rest are added as they are made).
@@ -212,22 +212,41 @@ export async function orbsView(h, show, call) {
     );
   }
   function orbSheet(o) {
+    const toggle = async (on) => {
+      if (!(await server('orb_toggle', { slot: o.slot, on }))) return;
+      if (menuChanged()) await publishMenu(true);
+      home();
+    };
+    // The owner agreed: place the pieces (unlit), let the AI fill in their settings, then
+    // open the board so they can look, pick the conversation and switch the orb on.
+    const agree = async (plan) => {
+      if (!(await server('orb_apply', { slot: o.slot, orb: o, plan }, '放上拼圖…'))) return;
+      const placed = state.orbs.find((x) => x.slot === o.slot);
+      board(placed);
+      if (placed.target) await check({});
+      else notice('拼圖放好了', '請先在上面選「對話對象」，再按右上角的「確認」。');
+    };
+    const offer = (plan, note, base) =>
+      planSheet(ui, base, plan, note, { agree: () => agree(plan), again: () => orbSheet(base) });
+    const has = (plan) => plan && (plan.suggest.length || plan.drop.length || plan.face);
     adjustSheet(ui, o, {
       open: () => board(o),
-      toggle: async (on) => {
-        if (!(await server('orb_toggle', { slot: o.slot, on }))) return;
-        if (menuChanged()) await publishMenu(true);
-        home();
+      toggle,
+      // An orb that is not set up yet: ask what pieces it needs.
+      plan: async (request) => {
+        const r = await server('orb_plan', { slot: o.slot, orb: o, request }, 'AI 規劃中…');
+        if (!r) return;
+        if (has(r.proposal)) return offer(r.proposal, r.note, o);
+        notice('秘書的建議', r.note || '這個需求目前的拼圖做不到，可以聯絡服務人員。');
       },
-      // The request goes to the AI with this orb's pieces; it can change them and the layout.
+      // A working orb: the AI changes its pieces and layout, and may suggest more pieces.
       tune: async (request) => {
-        cur = structuredClone(o);
         const r = await server('orb_check', { slot: o.slot, orb: o, answers: {}, request }, 'AI 調整中…');
-        cur = null;
         if (!r) return;
         if (menuChanged()) await publishMenu(true);
         home();
         const now = state.orbs.find((x) => x.slot === o.slot);
+        if (has(r.proposal)) return offer(r.proposal, r.note, now);
         notice(r.issues[0] ? 'AI 想確認一下' : '調整好了', r.issues[0]?.text ?? `${r.note || '已經照你說的調整。'}\n\n顯示介面：${faceLabel(now)}`);
       },
     });

@@ -164,3 +164,44 @@ test('顯示介面: one face per orb, layouts limited to the list, old orbs upgr
   assert.deepEqual(old.pieces[1].params, { time: '07:00', show: 'calendar', day: 'today' });
   assert.equal(old.pieces[2].params?.word, '小秘');
 });
+
+test('a recorded line is acknowledged with 「收到」 in one of ten languages plus Chinese', async () => {
+  const { GOT_IT, gotIt } = await import('../template/supabase/functions/_shared/persona.ts');
+  assert.equal(new Set(GOT_IT).size, 10);
+  assert.equal(gotIt(0), 'Got it!（收到）');
+  assert.equal(gotIt(0.999), 'Recebido!（收到）');
+  assert.equal(gotIt(1), 'Recebido!（收到）'); // never out of range
+});
+
+test('AI proposals are limited to what the orb may hold, and applying one never lights the orb', async () => {
+  const { cleanPlan, applyPlan } = await import('../template/supabase/functions/_shared/orb-model.ts');
+  const mine = defaultOrbs()[0]; // 1:1 chat, calendar, has a 指令
+  const plan = cleanPlan(
+    {
+      face: 'stats',
+      drop: [5, 99],
+      suggest: [
+        { type: 'stats', text: '統計便當' }, // groups only
+        { type: 'command', text: '第二個暗號' }, // already has one
+        { type: 'push', text: '每天 08:00 提醒我待辦' },
+        { type: 'shell', text: 'x' },
+      ],
+    },
+    mine,
+  );
+  assert.deepEqual(plan, { face: '', drop: [5], suggest: [{ type: 'push', text: '每天 08:00 提醒我待辦' }] });
+  const next = applyPlan(mine, plan);
+  assert.equal(next.on, false);
+  assert.deepEqual(next.pieces.map((p) => p.id), [1, 2, 3, 4, 6]);
+  assert.equal(next.pieces.at(-1)?.params, null); // still has to pass 確認
+  assert.ok(next.links.every(([a, b]) => a !== 5 && b !== 5));
+  assert.deepEqual(next.links.at(-1), [4, 6]);
+  // An empty group orb takes the whole set and the proposed page.
+  const empty = { ...defaultOrbs()[1], target: 'C1' };
+  const whole = cleanPlan({ face: 'stats', suggest: [{ type: 'record', text: '記下訂餐' }, { type: 'stats', text: '統計便當' }], drop: [] }, empty);
+  const built = applyPlan(empty, whole);
+  assert.equal(built.face, 'stats');
+  assert.equal(built.template, 'rank');
+  assert.deepEqual(built.pieces.map((p) => p.type), ['record', 'stats']);
+  assert.deepEqual(built.links, [[1, 2]]);
+});

@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
       const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
       return respond(await showData(orb, user.sub, line, body, `show-${crypto.randomUUID()}`));
     }
-    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle', 'orb_persona'].includes(body.action)) {
+    if (['orb_list', 'orb_save', 'orb_check', 'orb_toggle', 'orb_persona', 'orb_plan', 'orb_apply'].includes(body.action)) {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       await guardOwner(user.sub, body.action !== 'orb_list');
       const out = await orbAction(body.action, body, `orb-${crypto.randomUUID()}`);
