@@ -174,6 +174,38 @@ function quotaBars(data) {
   );
 }
 
+// Calendar subscription: one-way (秘書 → 行事曆); Google refreshes it a few times a day.
+function calendarCard() {
+  const out = h('div', {});
+  const open = async (action) => {
+    out.replaceChildren(h('p', { class: 'muted' }, '準備連結…'));
+    try {
+      const r = await call(action);
+      const link = (label, href) => h('a', { class: 'btn', href, target: '_blank', rel: 'noopener' }, label);
+      const again = h('button', { class: 'btn', type: 'button' }, '重新產生連結（舊連結失效）');
+      again.addEventListener('click', () => open('ics_reset'));
+      out.replaceChildren(link('加入 Google 行事曆', r.google), link('加入 iPhone／Mac 行事曆', r.apple), again);
+    } catch (e) {
+      const msg = e.message === 'pin_cancelled' ? '' : securityMessage(e.message);
+      out.replaceChildren(msg ? h('p', { class: 'error' }, msg) : start);
+    }
+  };
+  const start = h('button', { class: 'btn', type: 'button' }, '取得訂閱連結');
+  start.addEventListener('click', () => open('ics_link'));
+  out.append(start);
+  return h(
+    'section',
+    { class: 'card' },
+    h('h3', {}, '📅 加入 Google／iPhone 行事曆'),
+    h(
+      'p',
+      { class: 'muted' },
+      '訂閱後，秘書記下的行程會出現在你的行事曆（單向同步）。Google 行事曆大約半天到一天更新一次。這個連結等於鑰匙，請不要分享給別人。',
+    ),
+    out,
+  );
+}
+
 // 更多設定. 秘書設定: only what the orb page does not cover — quota, cross-account links,
 // the PIN. 介面設定: changing the look belongs to the 領航者版 and is not open yet.
 async function settingsView(view) {
@@ -204,6 +236,7 @@ async function settingsView(view) {
             h('p', { class: 'muted' }, '和其他官方帳號互傳指定資訊，雙方都同意才會連結。'),
             h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
           ),
+          calendarCard(),
           await securitySection(h, call),
         ]),
   );
