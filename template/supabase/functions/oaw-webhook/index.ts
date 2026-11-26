@@ -9,6 +9,7 @@ import {
 } from '../_shared/logic.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
 import {
+  privateCard,
   askCard,
   exampleCard,
   matchExample,
@@ -18,7 +19,7 @@ import {
 import { PX } from '../_shared/px.ts';
 import { healthEnabled, healthChat } from '../_shared/health-chat.ts';
 import { applyProposal, healthSnapshot, settingsReply } from '../_shared/owner-settings.ts';
-import { guardOwner, ownerLocked } from '../_shared/guard.ts';
+import { privateSecretary, guardOwner, ownerLocked } from '../_shared/guard.ts';
 import { bindNamedGroup, groupPostback, groupText, ownerGroupSend } from '../_shared/groups.ts';
 import { gotIt } from '../_shared/persona.ts';
 import { loadOrbs, sharedPersona } from '../_shared/orbs.ts';
@@ -108,6 +109,18 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   const reply = (...messages: unknown[]) => line.reply(replyToken, messages);
 
   if (event.type === 'follow') {
+    if (await privateSecretary()) {
+      // A private secretary keeps no list of friends and greets only its owner.
+      const boss = await ownerId();
+      await reply(
+        !boss
+          ? noticeCard('AI 秘書準備好了', '管理者請回 Aprico 官方帳號傳「連接我的OA」，完成最後一步。')
+          : boss === userId
+            ? welcomeOwner('歡迎回來。')
+            : privateCard(),
+      );
+      return;
+    }
     const profile = await line.profile(userId).catch(() => ({ displayName: '' }));
     await upsertMember(userId, profile.displayName ?? '');
     if (config.welcome) await reply(noticeCard(config.oaName || '歡迎', config.welcome));
@@ -156,6 +169,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     }
     const health = await healthChat(event, userId, ownerNow, line);
     if (health) return void (await reply(health));
+    if (await privateSecretary())
+      return void (ownerNow !== userId && (await reply(privateCard())));
     const index = postbackCell(String(event.postback?.data ?? ''), config);
     if (index >= 0) await reply(cellMessage(config, index, IMAGE_BASE));
     return;
@@ -225,6 +240,13 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   const health = await healthChat(event, userId, owner, line);
   if (health) return void (await reply(health));
   let intent = textIntent(event.message.text, config, owner === userId);
+  // 秘書版 is private: a stranger gets one fixed card (no AI, nothing recorded), and the old
+  // menu keywords (營業時間…) are not answered. Connecting and binding still work, so the
+  // rightful owner can always get in.
+  if (!['connect', 'bind'].includes(intent.kind) && (owner !== userId || intent.kind === 'cell') && (await privateSecretary())) {
+    if (owner !== userId) return void (await reply(privateCard()));
+    intent = { kind: 'secretary' };
+  }
   if (intent.kind === 'connect') {
     if (owner && owner !== userId) {
       await reply(noticeCard('無法連接', '這個帳號已經有管理者了。'));
@@ -251,9 +273,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
       return;
     }
     if (!healthEnabled()) {
-      // 秘書版: no owner-only menu and no questionnaire. The orb page is where everything is.
-      // Drop a personal menu left from an older version so the shared four-cell menu shows.
-      await line.call(`/v2/bot/user/${userId}/richmenu`, undefined, 'DELETE').catch(() => null);
+      // 秘書版: no questionnaire. The four-cell menu belongs to the owner alone.
+      await line.linkMenuByName(userId, `${PX}-main`).catch(() => false);
       await reply(welcomeOwner(owner ? 'AI 秘書已重新連接。' : '你已是這個帳號的管理者，AI 秘書也啟用了。'));
       return;
     }
@@ -270,6 +291,7 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
   if (intent.kind === 'bind') {
     if (await bindOwner(userId, intent.code)) {
       if (!healthEnabled()) {
+        await line.linkMenuByName(userId, `${PX}-main`).catch(() => false);
         await reply(welcomeOwner('已把你設定為這個帳號的管理者。'));
         return;
       }

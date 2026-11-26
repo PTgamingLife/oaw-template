@@ -270,6 +270,15 @@ async function main() {
   if (!liff.isLoggedIn()) return liff.login({ redirectUri: location.href });
   const params = new URLSearchParams(location.search);
   const [me, profile] = await Promise.all([call('me'), liff.getProfile().catch(() => null)]);
+  // 秘書版: someone who is not the owner sees only this notice.
+  if (me.private && !me.isOwner) {
+    document.body.classList.add('brand');
+    return show(
+      h('h1', {}, '這是私人的 AI 秘書'),
+      h('p', { class: 'muted' }, '它目前只服務自己的主人。想要一個專屬於你的 AI 秘書嗎？'),
+      h('a', { class: 'btn primary', href: 'https://line.me/R/ti/p/@228srwlt' }, '認識 Aprico AI 秘書'),
+    );
+  }
   document.documentElement.style.setProperty('--accent', me.config.colors[0]);
   document.title = me.config.oaName || '會員中心';
   if (params.get('view') === 'admin') return adminView(me);

@@ -240,6 +240,15 @@ export function quotaCard(subscribeUrl: string) {
   );
 }
 
+/** What a stranger gets from a private secretary: no AI, no data, and a way to get their own. */
+export function privateCard() {
+  return noticeCard(
+    '這是私人的 AI 秘書',
+    '它目前只服務自己的主人，所以沒辦法回覆你的訊息。\n\n想要一個專屬於你的 AI 秘書嗎？',
+    { label: '認識 Aprico AI 秘書', uri: 'https://line.me/R/ti/p/@228srwlt' },
+  );
+}
+
 /** A card button opens a page (uri) or reports back to the webhook (data → postback). */
 type CardButton = { label: string; uri: string } | { label: string; data: string; text?: string };
 
