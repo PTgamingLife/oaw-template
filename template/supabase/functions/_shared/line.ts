@@ -48,7 +48,17 @@ export function lineClient(token: string, fetcher = fetch) {
       call('/v2/bot/message/push', { to, messages: messages.slice(0, 5) }),
     profile: (userId: string) =>
       call(`/v2/bot/profile/${encodeURIComponent(userId)}`, undefined, 'GET'),
-    async publishMenu(menu: unknown, png: Uint8Array<ArrayBuffer>, name: string, type = 'image/png') {
+    /**
+     * `onlyFor`: show the menu to that one user (the owner of a private secretary) and to
+     * nobody else; without it the menu is every friend's default.
+     */
+    async publishMenu(
+      menu: unknown,
+      png: Uint8Array<ArrayBuffer>,
+      name: string,
+      type = 'image/png',
+      onlyFor = '',
+    ) {
       const { richmenus = [] } = await call('/v2/bot/richmenu/list', undefined, 'GET');
       const { richMenuId } = await call('/v2/bot/richmenu', menu);
       const up = await fetcher(`${DATA_API}/v2/bot/richmenu/${richMenuId}/content`, {
@@ -57,7 +67,10 @@ export function lineClient(token: string, fetcher = fetch) {
         body: png,
       });
       if (!up.ok) throw Error(`line_menu_image_${up.status}`);
-      await call(`/v2/bot/user/all/richmenu/${richMenuId}`, undefined, 'POST');
+      if (onlyFor) {
+        await call(`/v2/bot/user/${encodeURIComponent(onlyFor)}/richmenu/${richMenuId}`, undefined, 'POST');
+        await call('/v2/bot/user/all/richmenu', undefined, 'DELETE').catch(() => null);
+      } else await call(`/v2/bot/user/all/richmenu/${richMenuId}`, undefined, 'POST');
       // Remove older menus of this OA app only after the new one is live.
       for (const m of richmenus)
         if (m.name === name && m.richMenuId !== richMenuId)

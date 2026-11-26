@@ -22,6 +22,29 @@ export async function ownerLocked(): Promise<boolean | null> {
   }
 }
 
+/**
+ * 秘書版 (not the health template, not 領航者版): the account is its owner's private secretary.
+ * Strangers who add it get no AI replies, no menu and no member record. When Aprico cannot be
+ * asked, it counts as private: that never spends the owner's quota on someone else.
+ */
+export async function privateSecretary(): Promise<boolean> {
+  if (env('TEMPLATE') === 'health') return false;
+  const base = env('APRICO_URL'),
+    key = await apricoKey();
+  if (!base || !key) return true;
+  try {
+    const res = await fetch(`${base}/status`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(5000),
+    });
+    return !(res.ok && (await res.json())?.plan === 'navigator');
+  } catch {
+    return true;
+  }
+}
+
 async function pinRow(): Promise<any> {
   const { data } = await db
     .from(T('owner'))

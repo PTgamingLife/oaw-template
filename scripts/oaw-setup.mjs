@@ -403,8 +403,8 @@ async function main() {
       if (m.name === `${px}-owner`)
         await api(LINE, `/v2/bot/richmenu/${m.richMenuId}`, { token: botToken, method: 'DELETE' });
   } else {
-    // 秘書版: everyone gets the fixed four-cell menu (打開秘書 + three orbs). It is published
-    // once; later the orb page republishes it whenever the owner changes an orb's command.
+    // 秘書版: the fixed four-cell menu (打開秘書 + three orbs), for the owner only. It is made
+    // once; later the orb page republishes it whenever the owner changes an orb's page.
     if (!richmenus.some((m) => m.name === `${px}-main`)) {
       const made = await api(LINE, '/v2/bot/richmenu', {
         token: botToken,
@@ -417,7 +417,15 @@ async function main() {
         body: readFileSync('oaw/orb-menu.png'),
       });
       if (!up.ok) throw Error(`上傳選單圖片失敗（HTTP ${up.status}）`);
-      await api(LINE, `/v2/bot/user/all/richmenu/${made.richMenuId}`, { token: botToken, method: 'POST' });
+      // A private secretary shows its menu to the owner only (linked again when they connect).
+      const owners = await api(SB, `/v1/projects/${ref}/database/query`, {
+        token: sbToken,
+        method: 'POST',
+        body: { query: `select line_user_id from public.${px}_owner where id = 1` },
+      }).catch(() => []);
+      const ownerId = Array.isArray(owners) ? (owners[0]?.line_user_id ?? '') : '';
+      if (/^U[0-9a-f]{32}$/.test(ownerId))
+        await api(LINE, `/v2/bot/user/${ownerId}/richmenu/${made.richMenuId}`, { token: botToken, method: 'POST' });
     }
     // The old owner-only menu (設定我的 AI 秘書／介面) is gone: settings live on the orb page.
     for (const m of richmenus)

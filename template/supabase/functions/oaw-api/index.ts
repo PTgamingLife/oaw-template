@@ -15,7 +15,7 @@ import {
 } from '../_shared/store.ts';
 import { PX } from '../_shared/px.ts';
 import { healthAction } from '../_shared/health-api.ts';
-import { guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
+import { privateSecretary, guardOwner, pinStatus, setPin, verifyPin } from '../_shared/guard.ts';
 import { applyProposal } from '../_shared/owner-settings.ts';
 import { groupAction } from '../_shared/groups.ts';
 import { loadOrbs, orbAction } from '../_shared/orbs.ts';
@@ -158,6 +158,9 @@ Deno.serve(async (req) => {
     const config = await loadConfig();
     const isOwner = (await ownerId()) === user.sub;
     if (body.action === 'me') {
+      // A private secretary has no members: a stranger gets the notice page and no record.
+      if (!isOwner && (await privateSecretary()))
+        return respond({ config: publicConfig(config), member: null, isOwner: false, private: true });
       let card = await member(user.sub);
       if (!card) {
         await upsertMember(user.sub, user.name);
@@ -240,9 +243,16 @@ Deno.serve(async (req) => {
       await guardOwner(user.sub, true);
       const png = decodePng(body.image, 405);
       const line = lineClient(await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
-      const id = await line.publishMenu(orbMenu(await loadOrbs(), PX, env('LIFF_URL')), png, `${PX}-main`);
-      // The owner sees the same menu as everyone; settings are reached from the orb page.
-      await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
+      // A private secretary's menu is shown to its owner only; strangers see no menu.
+      const mine = (await privateSecretary()) ? user.sub : '';
+      const id = await line.publishMenu(
+        orbMenu(await loadOrbs(), PX, env('LIFF_URL')),
+        png,
+        `${PX}-main`,
+        'image/png',
+        mine,
+      );
+      if (!mine) await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
       return respond({ ok: true, richMenuId: id });
     }
     if (body.action === 'ics_link' || body.action === 'ics_reset') {
