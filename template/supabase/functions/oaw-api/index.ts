@@ -31,6 +31,7 @@ import { decodeJpeg, designChat, designOpen, designUpload, jpegSize } from '../_
 import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
 import { acceptLink, aprLink, createLink, listLinks, pullInbox } from '../_shared/links.ts';
+import { afterStatus, STATUS_BODY } from '../_shared/pair.ts';
 import {
   APRICO_PAGES,
   DEFAULT_SUBSCRIBE_URL,
@@ -61,10 +62,11 @@ async function quota(): Promise<Quota> {
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: '{}',
+      body: STATUS_BODY,
       signal: AbortSignal.timeout(5000),
     });
     const q = res.ok ? await res.json() : null;
+    await afterStatus(q);
     const plan = q?.plan === 'navigator' ? 'navigator' : 'secretary';
     const latest = /^\d{4}\.\d{2}\.\d{2}(\.\d+)?$/.test(q?.latest ?? '') ? (q.latest as string) : '';
     if (q?.paid !== true) return { paid: false, plan, latest };
