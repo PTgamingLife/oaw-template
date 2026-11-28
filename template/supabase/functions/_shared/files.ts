@@ -73,7 +73,7 @@ export async function ownerCommand(text: string, replyToken: string, owner: stri
     // Without the piece the word is an ordinary message.
     if (!pieceOf(orbFor(await loadOrbs(), 'me'), 'divine')) return false;
     const liff = env('LIFF_URL');
-    await reply(noticeCard('🐢 今日一卦', '心裡默想今天最在意的一件事，搖 6 次龜殼成卦。一天只占一卦。', liff ? { label: '開始卜卦', uri: `${liff}?view=divine` } : undefined));
+    await reply(noticeCard('🐢 今日一卦', '心裡默想今天最在意的一件事，點 6 次龜殼成卦。一天只占一卦。', liff ? { label: '開始卜卦', uri: `${liff}?view=divine` } : undefined));
     return true;
   }
   if (text === FIT_COMMAND) {

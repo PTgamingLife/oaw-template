@@ -1,18 +1,14 @@
-// ?view=divine — 今日一卦: hold the turtle shell (or shake the phone) for about a second to get
-// one line; six lines make the hexagram. The coins are thrown on the server, once per line.
+// ?view=divine — 今日一卦: tap the turtle shell to get one line; six lines make the hexagram.
+// The coins are thrown on the server, once per line.
 import { YAO_NAMES, isMoving, reading, yaoBit, yaoLabel } from './divine-model.js';
 
-const HOLD_MS = 1000;
+const SHAKE_MS = 700; // the shell rattles this long before the line shows
 
 export async function divineView(h, show, call) {
   document.body.classList.add('brand');
   const [first, book] = await Promise.all([call('divine_get'), fetch('iching.json').then((r) => r.json())]);
   let state = first,
-    busy = false,
-    timer = 0,
-    shakeMs = 0,
-    lastMotion = 0,
-    asked = false;
+    busy = false;
   const note = h('p', { class: 'divine-note' });
   const back = h('a', { class: 'back', href: '?view=orbs' }, '← 回我的 AI 秘書');
 
@@ -50,28 +46,19 @@ export async function divineView(h, show, call) {
   };
 
   async function cast() {
-    clearTimeout(timer);
-    timer = 0;
-    shakeMs = 0;
     if (busy || state.lines.length >= 6) return;
     busy = true;
+    document.getElementById('divine-turtle')?.classList.add('shaking');
     try {
-      state = await call('divine_cast');
+      const [next] = await Promise.all([call('divine_cast'), new Promise((r) => setTimeout(r, SHAKE_MS))]);
+      state = next;
       const y = state.yao;
       draw(y ? `得一爻：${y.coins.map((c) => (c === 3 ? '正' : '反')).join('、')} → ${YAO_NAMES[y.value]}` : '');
     } catch {
-      draw('暫時連不上，請再試一次。');
+      draw('暫時連不上，請再點一次。');
     }
     busy = false;
   }
-  const shaking = (on) => document.getElementById('divine-turtle')?.classList.toggle('shaking', on);
-  // iOS only gives motion data after a permission request made inside a tap.
-  const askMotion = () => {
-    if (asked) return;
-    asked = true;
-    const DM = window.DeviceMotionEvent;
-    if (DM && typeof DM.requestPermission === 'function') DM.requestPermission().catch(() => {});
-  };
 
   function draw(message = '') {
     note.textContent = message;
@@ -89,32 +76,17 @@ export async function divineView(h, show, call) {
       : null;
     if (lines.length >= 6)
       return show(back, h('h1', {}, '今日一卦'), h('section', { class: 'card divine' }, stack(lines), result(lines)), past);
-    const turtle = h('button', { type: 'button', id: 'divine-turtle', class: 'divine-turtle', 'aria-label': '按住搖龜殼' }, h('img', { src: 'assets/divine-turtle.webp', alt: '龜殼與三枚古錢', draggable: 'false' }));
-    turtle.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      askMotion();
-      shaking(true);
-      clearTimeout(timer);
-      timer = setTimeout(cast, HOLD_MS);
-    });
-    for (const t of ['pointerup', 'pointercancel', 'pointerleave'])
-      turtle.addEventListener(t, () => {
-        if (!timer) return;
-        clearTimeout(timer);
-        timer = 0;
-        shaking(false);
-        note.textContent = '再按久一點，搖滿約 1 秒才會出爻。';
-      });
-    turtle.addEventListener('contextmenu', (e) => e.preventDefault());
+    const turtle = h('button', { type: 'button', id: 'divine-turtle', class: 'divine-turtle', 'aria-label': '點龜殼擲錢' }, h('img', { src: 'assets/divine-turtle.webp', alt: '龜殼與三枚古錢', draggable: 'false' }));
+    turtle.addEventListener('click', cast);
     show(
       back,
       h('h1', {}, '今日一卦'),
       h(
         'section',
         { class: 'card divine' },
-        h('p', { class: 'muted' }, '心裡默想今天最在意的一件事，按住龜殼搖一搖（約 1 秒）得一爻，也可以直接搖手機；搖滿 6 次成卦。一天只占一卦。'),
+        h('p', { class: 'muted' }, '心裡默想今天最在意的一件事，點一下龜殼得一爻，點滿 6 次成卦。一天只占一卦。'),
         turtle,
-        h('p', { class: 'divine-step' }, lines.length ? `已得 ${lines.length} 爻，再搖 ${6 - lines.length} 次` : '按住龜殼，開始第一爻'),
+        h('p', { class: 'divine-step' }, lines.length ? `已得 ${lines.length} 爻，再點 ${6 - lines.length} 次` : '點一下龜殼，開始第一爻'),
         note,
         lines.length ? stack(lines) : null,
       ),
@@ -122,22 +94,5 @@ export async function divineView(h, show, call) {
     );
   }
 
-  // Shaking the phone: about a second of clear movement gives one line.
-  window.addEventListener('devicemotion', (e) => {
-    if (!document.getElementById('divine-turtle')) return;
-    const a = e.acceleration || e.accelerationIncludingGravity;
-    if (!a) return;
-    const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0) - (e.acceleration ? 0 : 9.8);
-    const now = Date.now();
-    if (Math.abs(mag) > 6) {
-      shakeMs += Math.min(100, now - (lastMotion || now));
-      shaking(true);
-      if (shakeMs >= HOLD_MS) cast();
-    } else if (now - lastMotion > 400) {
-      shakeMs = 0;
-      if (!timer) shaking(false);
-    }
-    lastMotion = now;
-  });
   draw();
 }

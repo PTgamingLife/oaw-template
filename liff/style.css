@@ -566,8 +566,8 @@ body.brand {
 
 /* 卜卦: the turtle shell, the six lines and the hexagram texts. */
 .divine { text-align: center; }
-.divine-turtle { display: block; margin: 8px auto; padding: 0; border: 0; background: none; width: min(240px, 70vw); cursor: grab;
-  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.divine-turtle { display: block; margin: 8px auto; padding: 0; border: 0; background: none; width: min(240px, 70vw); cursor: pointer;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .divine-turtle img { width: 100%; border-radius: 50%; display: block; pointer-events: none; box-shadow: 0 14px 30px -18px rgba(43, 42, 74, .6); }
 .divine-turtle.shaking { animation: divine-shake .16s linear infinite; }
 @keyframes divine-shake { 0%, 100% { transform: rotate(0) translateX(0); } 25% { transform: rotate(-5deg) translateX(-4px); } 75% { transform: rotate(5deg) translateX(4px); } }

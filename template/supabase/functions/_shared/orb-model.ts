@@ -295,7 +295,7 @@ export function explainPiece(p: Piece, orb: Pick<Orb, 'target' | 'face'>): strin
     case 'answer':
       return '這個對話的每一則訊息都會回覆（每天最多 60 次，會用到 AI 額度）；只是交辦時回得很短。';
     case 'divine':
-      return '你說「卜卦」，秘書會給你今天的卜卦頁面：搖 6 次龜殼成一卦，顯示卦辭、變爻和白話說明。一天一卦，不用 AI 額度。';
+      return '你說「卜卦」，秘書會給你今天的卜卦頁面：點 6 次龜殼成一卦，顯示卦辭、變爻和白話說明。一天一卦，不用 AI 額度。';
     case 'study':
       return `你說「學習資料」再傳 .txt 或 Word 檔，秘書會一次出好 1 到 5 天的選擇題（只有這一次用到 AI 額度）。每天 ${v.time} 考當天的題目，隔天 ${v.review} 複習答錯的；還是答錯的，當晚會再出現。`;
   }
