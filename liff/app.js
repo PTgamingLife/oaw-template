@@ -300,6 +300,10 @@ async function main() {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以使用介面設計中心。');
     return (await import('./design.js')).designView(h, show, call, drawMenu, menuAreas);
   }
+  if (params.get('view') === 'fit') {
+    if (!me.isOwner) return fail('只有這個帳號的管理者可以看這一頁。');
+    return (await import('./fit.js')).fitView(h, show, call);
+  }
   if (params.get('view') === 'calendar') {
     if (!me.isOwner) return fail('只有這個帳號的管理者可以看行事曆。');
     return (await import('./calendar.js')).calendarView(h, show, call);

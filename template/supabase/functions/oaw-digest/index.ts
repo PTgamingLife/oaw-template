@@ -4,6 +4,7 @@
 //    puzzle piece (定時推播 / 提醒 / 統計截止).
 //  - the repo's older oaw-nightly workflow: header x-oaw-digest, an HMAC of the date with the
 //    LINE channel secret. It only runs the nightly organise.
+import { fitPurge } from '../_shared/fit.ts';
 import { lineClient, statelessToken } from '../_shared/line.ts';
 import { digestCard, digestKey, digestRows, mergeDigests } from '../_shared/digest.ts';
 import { aprDigest, fmt } from '../_shared/groups.ts';
@@ -43,6 +44,7 @@ async function tickJob(token: string) {
 
 async function organise(owner: string, line: ReturnType<typeof lineClient>) {
   await purgeOldMessages();
+  await fitPurge().then(() => {}, () => {});
   if (!env('APRICO_URL') || !(await apricoKey())) return { skipped: 'not_configured' };
   const orbs = await loadOrbs().catch(() => []);
   const today = new Date().toISOString().slice(0, 10);

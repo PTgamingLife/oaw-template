@@ -50,6 +50,8 @@ import {
   takePending,
   upsertMember,
 } from '../_shared/store.ts';
+import { fitFile, fitRun, fitStart } from '../_shared/fit.ts';
+import { FIT_COMMAND, FIT_GO } from '../_shared/fit-model.ts';
 
 /** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
 async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknown) {
@@ -175,9 +177,18 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     if (index >= 0) await reply(cellMessage(config, index, IMAGE_BASE));
     return;
   }
+  // 「適合功能」: the owner sends exported chats as .txt files, then says 開始分析.
+  if (event.type === 'message' && event.message?.type === 'file') {
+    if ((await ownerId()) !== userId) return;
+    const card = await fitFile(event.message, await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
+    if (card) await reply(card);
+    return;
+  }
   if (event.type !== 'message' || event.message?.type !== 'text') return;
 
   const owner = await ownerId();
+  if (owner === userId && event.message.text.trim() === FIT_COMMAND) return void (await reply(await fitStart()));
+  if (owner === userId && event.message.text.trim() === FIT_GO && (await fitRun(event.replyToken, userId, line))) return;
   // 「傳給設計部：…」 to a linked account: confirm first, then seal and send.
   if (owner === userId && /^傳給/.test(event.message.text.trim())) {
     const links = await listLinks().catch(() => []);
