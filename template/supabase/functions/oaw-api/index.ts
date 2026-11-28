@@ -23,6 +23,7 @@ import { showData } from '../_shared/show.ts';
 import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
+import { voiceOwner, voiceTurn } from '../_shared/voice.ts';
 import { decodeJpeg, designChat, designOpen, designUpload, jpegSize } from '../_shared/design.ts';
 import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
@@ -129,6 +130,21 @@ Deno.serve(async (req) => {
     });
   }
   if (req.method !== 'POST') return respond({ error: 'not_found' }, 404);
+  // 早晨語音播報: POST ?voice=<token> from the owner's iPhone shortcut. The token is the key.
+  const voice = new URL(req.url).searchParams.get('voice');
+  if (voice !== null) {
+    const row = await voiceOwner(voice);
+    if (!row) return new Response('not found', { status: 404 });
+    const raw = await req.text();
+    let said: unknown = {};
+    try {
+      said = raw.length <= 4000 && raw ? JSON.parse(raw) : {};
+    } catch {
+      said = {};
+    }
+    const token = await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'));
+    return respond(await voiceTurn(row, said, lineClient(token).push));
+  }
   let body: any;
   try {
     const raw = await req.text();
@@ -254,6 +270,17 @@ Deno.serve(async (req) => {
       );
       if (!mine) await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
       return respond({ ok: true, richMenuId: id });
+    }
+    if (body.action === 'voice_link' || body.action === 'voice_reset') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, true);
+      const { data: o } = await db.from(T('owner')).select('voice_token').eq('id', 1).maybeSingle();
+      let token: string = o?.voice_token ?? '';
+      if (!token || body.action === 'voice_reset') {
+        token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+        await db.from(T('owner')).update({ voice_token: token, voice: null }).eq('id', 1);
+      }
+      return respond({ url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/${PX}-api?voice=${token}` });
     }
     if (body.action === 'ics_link' || body.action === 'ics_reset') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

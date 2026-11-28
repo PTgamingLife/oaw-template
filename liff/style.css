@@ -541,3 +541,8 @@ body.brand {
   font-weight: 700;
   text-decoration: none;
 }
+
+/* 早晨語音播報: the private link and its buttons. */
+.voice-out { display: grid; gap: 8px; }
+.voice-out input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #c9cef2; border-radius: 12px;
+  font-size: 13px; color: #6b6a8c; background: #f7f8ff; }
