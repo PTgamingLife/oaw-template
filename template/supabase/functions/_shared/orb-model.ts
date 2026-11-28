@@ -3,7 +3,7 @@
 // words; Aprico's AI turns the words into `params` (never code). This file is pure: shapes,
 // validation, the default orb, local checks and the menu buttons. Testable with Node.
 
-export const PIECE_TYPES = ['record', 'organize', 'command', 'push', 'stats', 'announce', 'answer', 'study'] as const;
+export const PIECE_TYPES = ['record', 'organize', 'command', 'push', 'stats', 'announce', 'answer', 'study', 'divine'] as const;
 export type PieceType = (typeof PIECE_TYPES)[number];
 export const PIECE_NAME: Record<PieceType, string> = {
   record: '紀錄',
@@ -14,6 +14,7 @@ export const PIECE_NAME: Record<PieceType, string> = {
   announce: '公告',
   answer: '回答',
   study: '學習',
+  divine: '卜卦',
 };
 export const VIEWS = ['calendar', 'list', 'summary', 'stats'] as const;
 
@@ -122,6 +123,8 @@ export function cleanParams(type: PieceType, p: any): Record<string, unknown> | 
     case 'study':
       // Evening quiz and next-morning review of the material the owner uploads.
       return { time: hhmm(p.time) || '21:00', review: hhmm(p.review) || '07:30' };
+    case 'divine':
+      return {}; // 今日一卦 has no settings
   }
 }
 
@@ -291,6 +294,8 @@ export function explainPiece(p: Piece, orb: Pick<Orb, 'target' | 'face'>): strin
       return '你在個人對話說「發到群組：內容」，秘書會把內容發到這個群組。';
     case 'answer':
       return '這個對話的每一則訊息都會回覆（每天最多 60 次，會用到 AI 額度）；只是交辦時回得很短。';
+    case 'divine':
+      return '你說「卜卦」，秘書會給你今天的卜卦頁面：搖 6 次龜殼成一卦，顯示卦辭、變爻和白話說明。一天一卦，不用 AI 額度。';
     case 'study':
       return `你說「學習資料」再傳 .txt 或 Word 檔，秘書會一次出好 1 到 5 天的選擇題（只有這一次用到 AI 額度）。每天 ${v.time} 考當天的題目，隔天 ${v.review} 複習答錯的；還是答錯的，當晚會再出現。`;
   }
@@ -312,8 +317,8 @@ export function localIssues(orb: Orb, others: Orb[]): Issue[] {
     out.push({ piece: null, code: 'no_source', text: '整理和定時提醒都需要資料來源，但這裡沒有「紀錄」拼圖。' });
   if (orb.target === 'me' && orb.pieces.some((p) => p.type === 'announce' || p.type === 'stats'))
     out.push({ piece: null, code: 'group_only', text: '「公告」和「統計」要用在群組，請把對話對象改成群組。' });
-  if (orb.target && orb.target !== 'me' && orb.pieces.some((p) => p.type === 'study'))
-    out.push({ piece: null, code: 'me_only', text: '「學習」目前只能用在你自己的個人對話，請把對話對象改成個人對話。' });
+  if (orb.target && orb.target !== 'me' && orb.pieces.some((p) => p.type === 'study' || p.type === 'divine'))
+    out.push({ piece: null, code: 'me_only', text: '「學習」和「卜卦」目前只能用在你自己的個人對話，請把對話對象改成個人對話。' });
   return out;
 }
 

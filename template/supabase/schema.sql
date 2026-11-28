@@ -274,3 +274,6 @@ create table if not exists public.__px___study (
 alter table public.__px___study enable row level security;
 revoke all on public.__px___study from public, anon, authenticated;
 grant select, insert, update, delete on public.__px___study to service_role;
+
+-- 卜卦拼圖: the owner's hexagram of each day (lines 6-9 and the coins), last 30 days.
+alter table public.__px___owner add column if not exists divine jsonb;
