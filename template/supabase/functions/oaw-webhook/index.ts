@@ -52,6 +52,7 @@ import {
 } from '../_shared/store.ts';
 import { ownerCommand, ownerFile } from '../_shared/files.ts';
 import { studyPostback } from '../_shared/study.ts';
+import { nightAnswer } from '../_shared/daily.ts';
 
 /** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
 async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknown) {
@@ -68,7 +69,7 @@ async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknow
 }
 
 const lineToken = () => statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'));
-const RECORDED = '今晚 9 點會幫你整理成行程、帳務和待辦。';
+const RECORDED = '今晚會幫你整理成行程、帳務和待辦。';
 
 /**
  * Groups: the owner says 綁定群組 once; after that every text line is kept for the nightly
@@ -398,6 +399,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     case 'fallback':
       // The owner's own free text is a note for the nightly digest.
       if (owner === userId) {
+        // 晚間關心: while tonight's questions are open, the owner's words are the answers.
+        if (await nightAnswer(event, userId, line)) return;
         // Plain words can also be a settings request (「週報不要發給我」); ask Aprico first.
         const snap = await healthSnapshot();
         const { status, data } = await aprico('settings', {

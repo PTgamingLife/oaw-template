@@ -1,7 +1,7 @@
 // Timed work for one OA app. Deployed as `{px}-digest` (verify_jwt=false). Two callers:
 //  - this app's database (pg_cron → {px}_tick): header x-oaw-tick is a one-use token whose
 //    hash the database stored; body { job } names the nightly organise run or one timed
-//    puzzle piece (定時推播 / 提醒 / 統計截止).
+//    puzzle piece (定時推播 / 提醒 / 統計截止), or 每日關心 (morning / night).
 //  - the repo's older oaw-nightly workflow: header x-oaw-digest, an HMAC of the date with the
 //    LINE channel secret. It only runs the nightly organise.
 import { fitPurge } from '../_shared/fit.ts';
@@ -11,7 +11,8 @@ import { aprDigest, fmt } from '../_shared/groups.ts';
 import { sha256Hex } from '../_shared/logic.ts';
 import { noticeCard, quotaCard } from '../_shared/onboarding.ts';
 import { autoSend } from '../_shared/links.ts';
-import { loadOrbs } from '../_shared/orbs.ts';
+import { loadOrbs, syncCron } from '../_shared/orbs.ts';
+import { organiseHold, runMorning, runNight } from '../_shared/daily.ts';
 import { orbClaims, orbFor, pieceOf } from '../_shared/orb-logic.ts';
 import { runJob } from '../_shared/orb-run.ts';
 import {
@@ -113,7 +114,14 @@ Deno.serve(async (req) => {
   const owner = await ownerId();
   if (!owner) return json({ skipped: 'not_configured' });
   const line = lineClient(await statelessToken(env('LINE_MSG_ID'), secret));
-  if (job === 'digest') return json(await organise(owner, line));
+  if (job === 'morning') return json({ job, result: await runMorning(owner, line).catch(() => 'failed') });
+  if (job === 'night') return json({ job, result: await runNight(owner, line).catch(() => 'failed') });
+  if (job === 'digest') {
+    // An app updated from an older version gets its 每日關心 jobs registered here, once a day.
+    if (tick && (await onceToday('cron-sync'))) await syncCron(await loadOrbs()).catch(() => false);
+    const hold = await organiseHold().catch(() => '');
+    return json(hold ? { skipped: hold } : await organise(owner, line));
+  }
   const result = await runJob(job, await loadOrbs(), owner, line).catch(() => 'failed');
   return json({ job, result });
 });

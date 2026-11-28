@@ -2,6 +2,7 @@
 import { SHAPES, paintCells } from './menu-shapes.js';
 import { confirmView, securityMessage, securitySection, withPin } from './security.js';
 import { voiceCard } from './voice.js';
+import { dailyCard } from './daily.js';
 
 const app = document.getElementById('app');
 const cfg = window.OAW;
@@ -259,6 +260,7 @@ async function settingsView(view) {
             h('button', { class: 'btn', type: 'button', disabled: '' }, '開通中'),
           ),
           calendarCard(),
+          dailyCard(h, call, securityMessage),
           voiceCard(h, call, securityMessage),
           await versionCard(data),
           await securitySection(h, call),
