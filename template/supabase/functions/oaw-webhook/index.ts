@@ -50,8 +50,8 @@ import {
   takePending,
   upsertMember,
 } from '../_shared/store.ts';
-import { fitFile, fitRun, fitStart } from '../_shared/fit.ts';
-import { FIT_COMMAND, FIT_GO } from '../_shared/fit-model.ts';
+import { ownerCommand, ownerFile } from '../_shared/files.ts';
+import { studyPostback } from '../_shared/study.ts';
 
 /** Aprico app API: '' = secretary reply, 'design' = config edit, 'settings' = owner message. */
 async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknown) {
@@ -67,6 +67,7 @@ async function aprico(route: '' | 'design' | 'settings' | 'unlock', body: unknow
   return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
+const lineToken = () => statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'));
 const RECORDED = '今晚 9 點會幫你整理成行程、帳務和待辦。';
 
 /**
@@ -154,6 +155,8 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
         return void (await reply(noticeCard('沒有送出', sendErrorText((e as Error).message))));
       }
     }
+    const study = ownerNow === userId ? await studyPostback(data) : null;
+    if (study) return void (await reply(...study));
     if (
       ownerNow === userId &&
       (await groupPostback(data, userId, reply, line, String(event.webhookEventId ?? '')))
@@ -177,18 +180,16 @@ async function handle(event: any, line: ReturnType<typeof lineClient>) {
     if (index >= 0) await reply(cellMessage(config, index, IMAGE_BASE));
     return;
   }
-  // 「適合功能」: the owner sends exported chats as .txt files, then says 開始分析.
+  // Files from the owner: study material (學習資料) or exported chats (適合功能); see files.ts.
   if (event.type === 'message' && event.message?.type === 'file') {
     if ((await ownerId()) !== userId) return;
-    const card = await fitFile(event.message, await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET')));
-    if (card) await reply(card);
-    return;
+    const card = await ownerFile(event.message, await lineToken());
+    return void (card && (await reply(card)));
   }
   if (event.type !== 'message' || event.message?.type !== 'text') return;
 
   const owner = await ownerId();
-  if (owner === userId && event.message.text.trim() === FIT_COMMAND) return void (await reply(await fitStart()));
-  if (owner === userId && event.message.text.trim() === FIT_GO && (await fitRun(event.replyToken, userId, line))) return;
+  if (owner === userId && (await ownerCommand(event.message.text.trim(), event.replyToken, userId, line, await lineToken()))) return;
   // 「傳給設計部：…」 to a linked account: confirm first, then seal and send.
   if (owner === userId && /^傳給/.test(event.message.text.trim())) {
     const links = await listLinks().catch(() => []);
@@ -485,8 +486,7 @@ Deno.serve(async (req) => {
     return new Response('bad request', { status: 400 });
   }
   if (!events.length) return new Response('ok'); // LINE "Verify" sends no events.
-  const token = await statelessToken(env('LINE_MSG_ID'), env('LINE_MSG_SECRET'));
-  const line = lineClient(token);
+  const line = lineClient(await lineToken());
   for (const event of events.slice(0, 20)) {
     try {
       await handle(event, line);

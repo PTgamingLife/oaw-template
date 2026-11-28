@@ -5,6 +5,7 @@ import { answerAll, callWord, eventLine, upcomingEvents } from './groups.ts';
 import { orbFor, parseJob, pieceOf, tallyText, tallyTotals, windowStart } from './orb-logic.ts';
 import { FACE_NAME, type Orb, type Piece } from './orb-model.ts';
 import { personaFor } from './persona.ts';
+import { studyJob } from './study.ts';
 import { noticeCard, quotaCard } from './onboarding.ts';
 import { apricoKey, countToday, db, env, onceToday, saveMessage, T } from './store.ts';
 
@@ -196,6 +197,10 @@ export async function runJob(name: string, orbs: Orb[], owner: string, line: Lin
   const job = parseJob(name);
   if (!job || job.kind === 'digest') return 'unknown';
   const orb = orbs.find((o) => o.slot === job.slot && o.on);
+  if (job.kind === 'studyq' || job.kind === 'studyr') {
+    const on = orb?.target === 'me' && orb.pieces.some((p) => p.id === job.piece && p.type === 'study' && p.params);
+    return on && owner ? studyJob(job.kind, owner, line) : 'gone';
+  }
   const piece = orb?.pieces.find((p) => p.id === job.piece && p.type === job.kind && p.params);
   if (!orb || !piece || !owner) return 'gone';
   const to = orb.target === 'me' ? owner : orb.target;
