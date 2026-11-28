@@ -187,8 +187,13 @@ async function supabaseProject(token, px, previous) {
       );
     throw e;
   });
-  const org = E('OAW_SB_ORG') || orgs[0]?.id;
-  if (!org) throw Error('找不到 Supabase 組織');
+  let org = E('OAW_SB_ORG') || orgs[0]?.id;
+  // A brand-new Supabase account has no organization yet: make one, so the owner need not.
+  if (!org)
+    org = (
+      await api(SB, '/v1/organizations', { token, method: 'POST', body: { name: 'My Secretary' } }).catch(() => null)
+    )?.id;
+  if (!org) throw Error('Supabase 帳號還沒有 Organization：請先到 Supabase 建立一個 Organization（名稱隨意、方案選 Free）再試一次');
   const created = await api(SB, '/v1/projects', {
     token,
     method: 'POST',
