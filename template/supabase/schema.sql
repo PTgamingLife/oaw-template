@@ -253,3 +253,8 @@ revoke all on public.__px___h_profile, public.__px___h_measures, public.__px___h
 grant select, insert, update, delete on public.__px___h_profile, public.__px___h_measures,
   public.__px___h_scans, public.__px___h_events, public.__px___h_done,
   public.__px___h_caregivers to service_role;
+
+-- 早晨語音播報: a random token in the shortcut's address (changing it cuts the old one off),
+-- and the talk in progress (turns so far and a change waiting for the owner's yes).
+alter table public.__px___owner add column if not exists voice_token text;
+alter table public.__px___owner add column if not exists voice jsonb;

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>早晨語音播報設定</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap">
+<style>
+:root { --sky-a: #ede7fb; --sky-b: #d9e4fb; --sky-c: #f7f2ff; --ink: #2b2a4a; --soft: #6b6a8c; --line: #c9cef2;
+  --card: #ffffff; --deep: #5866d6; --sun: #ffc53d;
+  --body: 'Noto Sans TC', system-ui, -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: linear-gradient(160deg, var(--sky-a), var(--sky-b) 55%, var(--sky-c)); color: var(--ink);
+  font-family: var(--body); line-height: 1.8; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-size: 24px; font-weight: 900; margin: 0; }
+h2 { font-size: 17px; font-weight: 900; margin: 0 0 6px; }
+p { margin: 0; }
+.lead, .note { color: var(--soft); }
+.note { font-size: 13.5px; }
+section { background: var(--card); border-radius: 20px; padding: 16px 18px; box-shadow: 0 10px 24px rgba(88, 102, 214, .14); }
+ol { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; }
+ol ol { margin-top: 8px; gap: 6px; list-style: lower-alpha; }
+b { font-weight: 700; }
+code { background: #eef0ff; border-radius: 6px; padding: 1px 6px; font-size: .92em; word-break: break-all; }
+.say { background: #fff7de; border-radius: 12px; padding: 10px 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎙️ 早晨語音播報設定</h1>
+    <p class="lead">鬧鐘按掉後，iPhone 會自動唸出今天的行程，接著聽你說話。全部用 iPhone 內建的「捷徑」App，設定一次就好，大約 10 分鐘。</p>
+  </header>
+
+  <section>
+    <h2>開始前</h2>
+    <ol>
+      <li>到秘書的「更多設定」，按<b>取得語音連結</b>，再按<b>複製語音連結</b>。</li>
+      <li>這個連結等於鑰匙：拿到的人可以聽到並更改你的行程，請不要傳給別人。外流了就按「重新產生連結」。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>第一部分：建立捷徑</h2>
+    <ol>
+      <li>打開<b>捷徑</b> App →「捷徑」分頁 → 右上角<b>＋</b>，名稱改成<b>秘書早安</b>。</li>
+      <li>加入動作<b>文字</b>，把剛剛複製的語音連結貼進去。</li>
+      <li>加入<b>設定變數</b>：變數名稱填 <code>連結</code>。</li>
+      <li>加入<b>取得 URL 內容</b>：
+        <ol>
+          <li>URL 選變數 <code>連結</code>。</li>
+          <li>展開選項，<b>方法</b>選 <code>POST</code>，<b>要求本文</b>選 <code>JSON</code>。</li>
+          <li>加入一個欄位：類型「文字」，鍵 <code>start</code>，值 <code>1</code>。</li>
+        </ol>
+      </li>
+      <li>加入<b>設定變數</b>：變數名稱填 <code>回覆</code>。</li>
+      <li>加入<b>取得字典值</b>：取得 <code>say</code> 的值，來源選變數 <code>回覆</code>。接著加入<b>朗讀文字</b>。</li>
+      <li>加入<b>取得字典值</b>：取得 <code>more</code> 的值，來源選 <code>回覆</code>。接著加入<b>設定變數</b>，名稱填 <code>繼續</code>。</li>
+      <li>加入<b>重複</b>，次數設 <code>6</code>。<b>在重複裡面</b>依序放：
+        <ol>
+          <li><b>如果</b>：<code>繼續</code>「是」<code>yes</code>。以下四步放在「如果」裡面。</li>
+          <li><b>聽寫文字</b>：語言選「中文（台灣）」，停止聆聽選「暫停之後」。</li>
+          <li><b>取得 URL 內容</b>：URL 選 <code>連結</code>，方法 <code>POST</code>，要求本文 <code>JSON</code>，欄位類型「文字」、鍵 <code>text</code>、值選「聽寫的文字」。接著<b>設定變數</b> <code>回覆</code>。</li>
+          <li><b>取得字典值</b> <code>say</code>（來源 <code>回覆</code>）→ <b>朗讀文字</b>。</li>
+          <li><b>取得字典值</b> <code>more</code>（來源 <code>回覆</code>）→ <b>設定變數</b> <code>繼續</code>。</li>
+        </ol>
+      </li>
+      <li>在「結束重複」<b>後面</b>加入<b>取得 URL 內容</b>：URL 選 <code>連結</code>，方法 <code>POST</code>，要求本文 <code>JSON</code>，欄位類型「文字」、鍵 <code>end</code>、值 <code>1</code>。接著<b>設定變數</b> <code>回覆</code>。</li>
+      <li>加入<b>取得字典值</b> <code>open</code>（來源 <code>回覆</code>）→ <b>打開 URL</b>。這一步會打開 LINE 裡的秘書頁面。</li>
+      <li>按右上角「完成」。先手動點一下這個捷徑試試看，第一次會問是否允許連線與語音辨識，都選允許。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>第二部分：鬧鐘停止時自動執行</h2>
+    <ol>
+      <li>捷徑 App →<b>自動化</b>分頁 → <b>＋</b> → 選<b>鬧鐘</b>。</li>
+      <li>選<b>停止時</b>，鬧鐘選「任何」或你平日起床的那一個。</li>
+      <li>選<b>立即執行</b>（不要選「確認後執行」）。</li>
+      <li>動作選剛剛建立的捷徑<b>秘書早安</b>，完成。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>怎麼跟秘書說話</h2>
+    <p class="say">秘書：「早安，今天十點跟王先生開會，晚上七點家庭聚餐。有要調整的嗎？」<br>
+    你：「把十點的會改到十一點。」<br>
+    秘書：「把跟王先生的會改到早上十一點，這樣對嗎？」<br>
+    你：「對。」<br>
+    秘書：「好，改好了。」</p>
+    <ol style="margin-top:10px">
+      <li>秘書一定會先複述，你說「對」才會真的更改。</li>
+      <li>說「沒事了」就結束，接著會打開 LINE，聊天室裡會收到這次對話的紀錄。</li>
+      <li>一次最多來回 6 句，每天最多 40 句；每一句都會用到 AI 額度。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>沒有聲音？</h2>
+    <ol>
+      <li>朗讀用的是媒體音量：按掉鬧鐘後請確認音量有開。</li>
+      <li>手機鎖定時，部分動作可能要先解鎖才會執行。</li>
+      <li>聽寫時如果完全沒說話，捷徑會直接停止，這次就不會有紀錄。</li>
+    </ol>
+    <p class="note" style="margin-top:8px">目前只支援 iPhone。這個功能還在測試中，遇到問題請到 Aprico 官方帳號的「問題回報」告訴我們。</p>
+  </section>
+</main>
+</body>
+</html>
