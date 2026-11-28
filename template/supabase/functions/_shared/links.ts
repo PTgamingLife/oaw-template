@@ -49,6 +49,8 @@ export async function acceptLink(code: string, label: string, scope: unknown) {
   return aprLink('accept', { code, label, scope, key: (await myKeys()).publicKey, inbox: inbox() });
 }
 export const listLinks = async () => (await aprLink('list')).links as any[];
+/** 領航者版: link with the owner's other account; Aprico pairs the two by ownership. */
+export const pairAuto = async () => aprLink('pair', { key: (await myKeys()).publicKey, inbox: inbox() });
 
 /** Seal and send. Throws scope_closed / daily_limit / link_not_found from Aprico. */
 export async function sendLink(linkId: string, kind: string, text: string) {

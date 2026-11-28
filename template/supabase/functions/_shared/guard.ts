@@ -1,5 +1,6 @@
 // Owner protection: the PIN (asked again after 30 minutes, 5 wrong tries then a 15-minute
 // wait) and the emergency lock set in Aprico. Friends and caregivers are never affected.
+import { afterStatus, STATUS_BODY } from './pair.ts';
 import { checkPin, hashPin, LOCKOUT_MS, MAX_TRIES, PIN_TTL_MS, validPin } from './pin.ts';
 import { apricoKey, db, env, T } from './store.ts';
 
@@ -12,11 +13,13 @@ export async function ownerLocked(): Promise<boolean | null> {
     const res = await fetch(`${base}/status`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: '{}',
+      body: STATUS_BODY,
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    return (await res.json())?.locked === true;
+    const status = await res.json();
+    await afterStatus(status);
+    return status?.locked === true;
   } catch {
     return null;
   }
@@ -36,10 +39,12 @@ export async function privateSecretary(): Promise<boolean> {
     const res = await fetch(`${base}/status`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: '{}',
+      body: STATUS_BODY,
       signal: AbortSignal.timeout(5000),
     });
-    return !(res.ok && (await res.json())?.plan === 'navigator');
+    const status = res.ok ? await res.json() : null;
+    await afterStatus(status);
+    return status?.plan !== 'navigator';
   } catch {
     return true;
   }
