@@ -25,6 +25,7 @@ import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
 import { voiceOwner, voiceTurn } from '../_shared/voice.ts';
 import { fitResult } from '../_shared/fit.ts';
+import { divineAction } from '../_shared/divine.ts';
 import { studyEdit, studyView } from '../_shared/study.ts';
 import { decodeJpeg, designChat, designOpen, designUpload, jpegSize } from '../_shared/design.ts';
 import { validateConfig } from '../_shared/logic.ts';
@@ -278,6 +279,10 @@ Deno.serve(async (req) => {
       if (body.action === 'study_view') return respond(await studyView());
       await guardOwner(user.sub, false);
       return respond(await studyEdit(body));
+    }
+    if (body.action === 'divine_get' || body.action === 'divine_cast') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      return respond(await divineAction(body.action));
     }
     if (body.action === 'fit_result') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

@@ -11,6 +11,7 @@ import { orbFor, pieceOf } from './orb-logic.ts';
 import { loadOrbs } from './orbs.ts';
 import { STUDY_COMMAND, cleanMaterial, minDays } from './study-model.ts';
 import { studyCreate } from './study.ts';
+import { DIVINE_COMMAND } from './divine.ts';
 import { env } from './store.ts';
 
 type Line = { reply: (token: string, m: unknown[]) => Promise<unknown>; push: (to: string, m: unknown[]) => Promise<unknown> };
@@ -68,6 +69,13 @@ export async function ownerFile(message: any, token: string) {
 export async function ownerCommand(text: string, replyToken: string, owner: string, line: Line, token: string) {
   const reply = (...m: unknown[]) => line.reply(replyToken, m);
   if (text === FIT_GO) return fitRun(replyToken, owner, line);
+  if (text === DIVINE_COMMAND) {
+    // Without the piece the word is an ordinary message.
+    if (!pieceOf(orbFor(await loadOrbs(), 'me'), 'divine')) return false;
+    const liff = env('LIFF_URL');
+    await reply(noticeCard('🐢 今日一卦', '心裡默想今天最在意的一件事，點 6 次龜殼成卦。一天只占一卦。', liff ? { label: '開始卜卦', uri: `${liff}?view=divine` } : undefined));
+    return true;
+  }
   if (text === FIT_COMMAND) {
     const last = await get(LAST, 10);
     await drop(WAIT, DRAFT, LAST);

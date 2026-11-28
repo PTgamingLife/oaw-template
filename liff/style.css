@@ -563,3 +563,28 @@ body.brand {
 .study-list button { border: 0; background: none; color: #5866d6; font-size: 13px; padding: 4px 6px; }
 .study-del { margin-top: 14px; }
 .card details { margin-top: 8px; }
+
+/* 卜卦: the turtle shell, the six lines and the hexagram texts. */
+.divine { text-align: center; }
+.divine-turtle { display: block; margin: 8px auto; padding: 0; border: 0; background: none; width: min(240px, 70vw); cursor: pointer;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.divine-turtle img { width: 100%; border-radius: 50%; display: block; pointer-events: none; box-shadow: 0 14px 30px -18px rgba(43, 42, 74, .6); }
+.divine-turtle.shaking { animation: divine-shake .16s linear infinite; }
+@keyframes divine-shake { 0%, 100% { transform: rotate(0) translateX(0); } 25% { transform: rotate(-5deg) translateX(-4px); } 75% { transform: rotate(5deg) translateX(4px); } }
+.divine-step { font-weight: 700; font-size: 17px; margin: 4px 0 6px; }
+.divine-note { min-height: 1.4em; margin: 0 0 6px; color: #5866d6; font-size: 14px; }
+.divine-yaos { display: flex; flex-direction: column; gap: 8px; margin: 10px auto 14px; max-width: 300px; }
+.divine-yao { display: grid; grid-template-columns: 44px 1fr 1fr 74px; align-items: center; gap: 8px; font-size: 13px; }
+.divine-yao small { color: #6b6a8c; text-align: right; }
+.divine-yao em { font-style: normal; color: #6b6a8c; text-align: left; }
+.divine-yao i { height: 12px; background: #2b2a4a; border-radius: 3px; }
+.divine-yao.yang i:first-of-type { border-radius: 3px 0 0 3px; margin-right: -8px; }
+.divine-yao.yang i:last-of-type { border-radius: 0 3px 3px 0; margin-left: -8px; }
+.divine-yao.yin i:first-of-type { margin-right: 10px; }
+.divine-yao.yin i:last-of-type { margin-left: 10px; }
+.divine-yao.moving i { background: #f29a1f; }
+.divine-yao.moving em { color: #c9780a; font-weight: 700; }
+.divine-hex { text-align: left; border-top: 1px dashed #c9cef2; padding-top: 10px; margin-top: 10px; }
+.divine-hex h3 { margin: 8px 0 4px; }
+.divine-judg { font-weight: 700; font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .divine-turtle.shaking { animation-duration: .5s; } }
