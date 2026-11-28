@@ -21,7 +21,7 @@ import {
 import { cronJobs } from './orb-logic.ts';
 import { DEFAULT_PERSONA } from './persona.ts';
 import { PX } from './px.ts';
-import { apricoKey, db, env, T } from './store.ts';
+import { apricoKey, db, env, loadDaily, T } from './store.ts';
 
 export async function loadOrbs(): Promise<Orb[]> {
   const groups = (await listGroups()).map((g) => g.group_id);
@@ -67,7 +67,8 @@ async function saveOrb(orb: Orb) {
  */
 export async function syncCron(orbs: Orb[]) {
   const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${PX}-digest`;
-  const { error } = await db.rpc(T('cron_sync'), { jobs: cronJobs(orbs), url });
+  const daily = await loadDaily().catch(() => null);
+  const { error } = await db.rpc(T('cron_sync'), { jobs: cronJobs(orbs, daily), url });
   if (error) console.warn('oaw cron sync failed:', error.code ?? 'unknown');
   return !error;
 }

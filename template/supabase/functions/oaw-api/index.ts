@@ -24,6 +24,7 @@ import { orbMenu } from '../_shared/orb-model.ts';
 import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
 import { voiceOwner, voiceTurn } from '../_shared/voice.ts';
+import { dailyAction } from '../_shared/daily.ts';
 import { fitResult } from '../_shared/fit.ts';
 import { divineAction } from '../_shared/divine.ts';
 import { studyEdit, studyView } from '../_shared/study.ts';
@@ -289,6 +290,11 @@ Deno.serve(async (req) => {
     if (body.action === 'fit_result') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);
       return respond(await fitResult());
+    }
+    if (body.action === 'daily_get' || body.action === 'daily_save') {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      await guardOwner(user.sub, false);
+      return respond(await dailyAction(body.action, body));
     }
     if (body.action === 'voice_link' || body.action === 'voice_reset') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

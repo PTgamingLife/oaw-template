@@ -1,6 +1,7 @@
 // Pure runtime helpers for 光球 (testable with Node): which orb answers a conversation,
 // the database cron jobs a set of orbs needs, and the arithmetic of a 「統計」 tally.
 import type { Orb, Piece } from './orb-model.ts';
+import { addMinutes, NIGHT_WAIT_MINUTES, type Daily } from './daily-model.ts';
 
 /** The lit orb of one conversation ('me' or a group id), if any. */
 export const orbFor = (orbs: Orb[], target: string) =>
@@ -20,9 +21,17 @@ export type CronJob = { name: string; cron: string };
 /**
  * Jobs for the lit orbs: the nightly organise run (20:55), one per 定時提醒 piece, and
  * one per 統計 piece with a closing time (the result goes to the owner privately).
+ * 每日關心 (`daily`) adds the morning briefing and the evening questions; with the evening
+ * questions on, the organise run waits for the answers (it runs right after the last one,
+ * and this job is the fallback when the owner does not answer).
  */
-export function cronJobs(orbs: Orb[]): CronJob[] {
-  const jobs: CronJob[] = [{ name: 'digest', cron: cronAt('20:55') }];
+export function cronJobs(orbs: Orb[], daily: Daily | null = null): CronJob[] {
+  const night = daily?.night.on ? daily.night.time : '';
+  const jobs: CronJob[] = [
+    { name: 'digest', cron: cronAt(night ? addMinutes(night, NIGHT_WAIT_MINUTES) : '20:55') },
+  ];
+  if (daily?.morning.on) jobs.push({ name: 'morning', cron: cronAt(daily.morning.time) });
+  if (night) jobs.push({ name: 'night', cron: cronAt(night) });
   for (const o of orbs.filter((o) => o.on))
     for (const p of o.pieces) {
       if (!p.params) continue;

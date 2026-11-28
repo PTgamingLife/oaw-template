@@ -3,6 +3,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
 import { PX } from './px.ts';
 import { validateConfig, sha256Hex, type Config } from './logic.ts';
+import { cleanDaily, type Daily } from './daily-model.ts';
 
 const UP = PX.toUpperCase();
 export const env = (name: string) => Deno.env.get(`${UP}_${name}`) ?? '';
@@ -89,6 +90,16 @@ export async function bindOwner(userId: string, code: string) {
     .is('line_user_id', null)
     .select('id');
   return Boolean(updated?.length);
+}
+
+/**
+ * 每日關心 settings, or null where the routines do not run (the health template has its own
+ * reminders). An app whose database has no `daily` column yet gets the defaults.
+ */
+export async function loadDaily(): Promise<Daily | null> {
+  if (env('TEMPLATE') === 'health') return null;
+  const { data } = await db.from(T('owner')).select('daily').eq('id', 1).maybeSingle();
+  return cleanDaily(data?.daily);
 }
 
 export async function upsertMember(userId: string, displayName: string) {

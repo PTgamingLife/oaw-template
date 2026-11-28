@@ -275,5 +275,9 @@ alter table public.__px___study enable row level security;
 revoke all on public.__px___study from public, anon, authenticated;
 grant select, insert, update, delete on public.__px___study to service_role;
 
+-- 每日關心: the owner's settings for the morning briefing and the evening questions
+-- ({ morning: { on, time }, night: { on, time } }); null = the defaults (both on).
+alter table public.__px___owner add column if not exists daily jsonb;
+
 -- 卜卦拼圖: the owner's hexagram of each day (lines 6-9 and the coins), last 30 days.
 alter table public.__px___owner add column if not exists divine jsonb;
