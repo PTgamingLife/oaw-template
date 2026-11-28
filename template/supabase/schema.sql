@@ -258,3 +258,19 @@ grant select, insert, update, delete on public.__px___h_profile, public.__px___h
 -- and the talk in progress (turns so far and a change waiting for the owner's yes).
 alter table public.__px___owner add column if not exists voice_token text;
 alter table public.__px___owner add column if not exists voice jsonb;
+
+-- 學習拼圖: one row per uploaded study material. `course` holds every question (written once
+-- by the AI when it was uploaded); `log` holds the owner's answers. One course is active at a
+-- time; others wait as 'queued'.
+create table if not exists public.__px___study (
+  id bigint generated always as identity primary key,
+  title text not null,
+  status text not null check (status in ('active', 'queued', 'done')),
+  start_day date not null,
+  course jsonb not null,
+  log jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+alter table public.__px___study enable row level security;
+revoke all on public.__px___study from public, anon, authenticated;
+grant select, insert, update, delete on public.__px___study to service_role;

@@ -25,6 +25,10 @@ const keep = (list: string[]) =>
 /** Drop chat excerpts that were sent but never analysed (also run by the nightly job). */
 export const fitPurge = () =>
   db.from(T('pending')).delete().eq('line_user_id', FILES).lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+/** True while 「適合功能」 is waiting for chat files. */
+export const fitWaiting = async () => (await files()) !== null;
+/** Leave 「適合功能」 (the owner chose something else). */
+export const fitStop = () => clear();
 const clear = () => db.from(T('pending')).delete().eq('line_user_id', FILES);
 
 /** 適合功能: start over and explain how to export a chat. */

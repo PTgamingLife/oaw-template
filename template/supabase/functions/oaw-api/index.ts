@@ -25,6 +25,7 @@ import { buildIcs, icsLinks, sameToken } from '../_shared/ics.ts';
 import { calendarAction } from '../_shared/calendar.ts';
 import { voiceOwner, voiceTurn } from '../_shared/voice.ts';
 import { fitResult } from '../_shared/fit.ts';
+import { studyEdit, studyView } from '../_shared/study.ts';
 import { decodeJpeg, designChat, designOpen, designUpload, jpegSize } from '../_shared/design.ts';
 import { validateConfig } from '../_shared/logic.ts';
 import { db, T } from '../_shared/store.ts';
@@ -271,6 +272,12 @@ Deno.serve(async (req) => {
       );
       if (!mine) await line.call(`/v2/bot/user/${user.sub}/richmenu`, undefined, 'DELETE').catch(() => null);
       return respond({ ok: true, richMenuId: id });
+    }
+    if (['study_view', 'study_delete', 'study_flag'].includes(body.action)) {
+      if (!isOwner) return respond({ error: 'owner_only' }, 403);
+      if (body.action === 'study_view') return respond(await studyView());
+      await guardOwner(user.sub, false);
+      return respond(await studyEdit(body));
     }
     if (body.action === 'fit_result') {
       if (!isOwner) return respond({ error: 'owner_only' }, 403);

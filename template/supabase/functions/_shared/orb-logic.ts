@@ -30,14 +30,21 @@ export function cronJobs(orbs: Orb[]): CronJob[] {
         jobs.push({ name: `push-${o.slot}-${p.id}`, cron: cronAt(String(p.params.time)) });
       if (p.type === 'stats' && p.params.close)
         jobs.push({ name: `stats-${o.slot}-${p.id}`, cron: cronAt(String(p.params.close)) });
+      // 學習: the evening quiz and the next-morning review.
+      if (p.type === 'study')
+        jobs.push(
+          { name: `studyq-${o.slot}-${p.id}`, cron: cronAt(String(p.params.time)) },
+          { name: `studyr-${o.slot}-${p.id}`, cron: cronAt(String(p.params.review)) },
+        );
     }
   return jobs.slice(0, 30);
 }
 export function parseJob(name: string) {
   if (name === 'digest') return { kind: 'digest' as const, slot: 0, piece: 0 };
   // 'remind-…' names come from jobs registered by an older version; they run as 定時提醒.
-  const m = name.match(/^(push|remind|stats)-([1-4])-(\d{1,3})$/);
+  const m = name.match(/^(push|remind|stats|studyq|studyr)-([1-4])-(\d{1,3})$/);
   if (!m) return null;
+  if (m[1] === 'studyq' || m[1] === 'studyr') return { kind: m[1] as 'studyq' | 'studyr', slot: Number(m[2]), piece: Number(m[3]) };
   return { kind: (m[1] === 'stats' ? 'stats' : 'push') as 'push' | 'stats', slot: Number(m[2]), piece: Number(m[3]) };
 }
 
